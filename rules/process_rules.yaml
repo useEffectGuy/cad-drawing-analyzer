@@ -1,0 +1,254 @@
+# ============================================================
+# 工序识别规则库 (Process Rules)
+# ============================================================
+# 建立「构件类型 × 属性特征 → 工序类型」的映射。
+# 工程师可按项目工艺特点增删规则，无需修改代码。
+#
+# 字段说明：
+#   id            : 规则唯一标识
+#   name          : 规则名称
+#   discipline    : 适用专业（ARCH/STR/PLUMB/ELEC/HVAC/ALL）
+#   match         : 匹配条件
+#     category    : 构件类别（对应 CIO 的 category）
+#     keywords    : 属性/文字中需出现的关键词（任一命中即可）
+#     attr_keys   : 需存在的属性字段名
+#   processes     : 命中的工序序列（按施工先后顺序）
+#   duration_hint : 工序耗时提示（可选，用于工期估算）
+# ============================================================
+version: "1.0"
+rules:
+  # ---------------- 结构专业 ----------------
+  - id: P-ST-001
+    name: 钢筋混凝土墙
+    discipline: STR
+    match:
+      category: WALL
+      keywords: ["剪力墙", "混凝土", "C30", "C35", "C40", "RC"]
+    processes:
+      - 钢筋绑扎
+      - 模板支设
+      - 混凝土浇筑
+      - 模板拆除
+      - 混凝土养护
+    duration_hint: "养护不少于 7 天"
+  - id: P-ST-002
+    name: 钢筋混凝土柱
+    discipline: STR
+    match:
+      category: COLUMN
+      keywords: ["混凝土", "C30", "C35", "柱"]
+    processes:
+      - 钢筋绑扎
+      - 模板支设
+      - 混凝土浇筑
+      - 模板拆除
+      - 混凝土养护
+  - id: P-ST-003
+    name: 钢筋混凝土梁
+    discipline: STR
+    match:
+      category: BEAM
+      keywords: ["梁", "混凝土", "KL", "LL"]
+    processes:
+      - 梁底模板支设
+      - 钢筋绑扎
+      - 侧模支设
+      - 混凝土浇筑
+      - 模板拆除
+  - id: P-ST-004
+    name: 楼板
+    discipline: STR
+    match:
+      category: SLAB
+      keywords: ["板", "楼板", "混凝土"]
+    processes:
+      - 模板支设
+      - 钢筋绑扎
+      - 水电预埋
+      - 混凝土浇筑
+      - 养护
+  - id: P-ST-005
+    name: 钢结构构件
+    discipline: STR
+    match:
+      category: COLUMN
+      keywords: ["钢", "Q235", "Q345", "H型钢"]
+    processes:
+      - 构件加工
+      - 除锈涂装
+      - 运输吊装
+      - 高强螺栓连接
+      - 焊接
+      - 防腐涂装
+  # ---------------- 建筑专业 ----------------
+  - id: P-AR-001
+    name: 砌体墙
+    discipline: ARCH
+    match:
+      category: WALL
+      keywords: ["砌块", "加气", "砖", "砌体", "蒸压"]
+    processes:
+      - 放线
+      - 砌筑
+      - 构造柱浇筑
+      - 圈梁浇筑
+      - 墙面抹灰
+  - id: P-AR-002
+    name: 门窗安装
+    discipline: ARCH
+    match:
+      category: DOOR
+      keywords: ["门", "窗", "铝合金", "塑钢"]
+    processes:
+      - 洞口预留
+      - 洞口修整
+      - 门窗框安装
+      - 门窗扇安装
+      - 密封打胶
+  - id: P-AR-003
+    name: 窗安装
+    discipline: ARCH
+    match:
+      category: WINDOW
+      keywords: ["窗", "铝合金", "断桥"]
+    processes:
+      - 洞口预留
+      - 窗框安装
+      - 玻璃安装
+      - 打胶密封
+  # ---------------- 给排水专业 ----------------
+  - id: P-PL-001
+    name: 镀锌钢管安装
+    discipline: PLUMB
+    match:
+      category: PIPE
+      keywords: ["镀锌", "钢管", "DN"]
+    processes:
+      - 管道预制
+      - 支吊架安装
+      - 管道敷设
+      - 螺纹连接/沟槽连接
+      - 水压试验
+      - 防腐保温
+  - id: P-PL-002
+    name: PVC排水管安装
+    discipline: PLUMB
+    match:
+      category: PIPE
+      keywords: ["PVC", "排水", "塑料管"]
+    processes:
+      - 管道预制
+      - 支吊架安装
+      - 管道敷设
+      - 承插粘接
+      - 灌水试验
+  - id: P-PL-003
+    name: 阀门安装
+    discipline: PLUMB
+    match:
+      category: VALVE
+      keywords: ["阀", "闸阀", "蝶阀", "止回阀"]
+    processes:
+      - 阀门检验
+      - 阀门安装
+      - 法兰连接
+      - 严密性试验
+  - id: P-PL-004
+    name: 消火栓安装
+    discipline: PLUMB
+    match:
+      category: VALVE
+      keywords: ["消火栓"]
+    processes:
+      - 箱体安装
+      - 管道连接
+      - 水枪水带配置
+      - 试压验收
+  # ---------------- 电气专业 ----------------
+  - id: P-EL-001
+    name: 电缆桥架安装
+    discipline: ELEC
+    match:
+      category: CABLE
+      keywords: ["桥架", "线槽", "TRAY"]
+    processes:
+      - 支架安装
+      - 桥架组装
+      - 桥架固定
+      - 接地跨接
+      - 盖板安装
+  - id: P-EL-002
+    name: 电线管敷设
+    discipline: ELEC
+    match:
+      category: CABLE
+      keywords: ["PVC管", "JDG", "SC", "穿管"]
+    processes:
+      - 管路预制
+      - 管路敷设
+      - 管路固定
+      - 穿引线
+  - id: P-EL-003
+    name: 灯具安装
+    discipline: ELEC
+    match:
+      category: LIGHT
+      keywords: ["灯", "LED", "照明"]
+    processes:
+      - 灯具检验
+      - 接线
+      - 灯具安装
+      - 通电试亮
+  - id: P-EL-004
+    name: 配电箱安装
+    discipline: ELEC
+    match:
+      category: PANEL
+      keywords: ["配电箱", "配电柜", "POWER_BOX"]
+    processes:
+      - 基础型钢制作
+      - 箱体安装
+      - 进出线连接
+      - 绝缘测试
+      - 送电调试
+  - id: P-EL-005
+    name: 插座开关安装
+    discipline: ELEC
+    match:
+      category: SOCKET
+      keywords: ["插座", "开关"]
+    processes:
+      - 接线盒预埋
+      - 面板接线
+      - 面板安装
+      - 通电测试
+  # ---------------- 暖通专业 ----------------
+  - id: P-HV-001
+    name: 风管制作安装
+    discipline: HVAC
+    match:
+      category: DUCT
+      keywords: ["风管", "镀锌钢板", "DUCT"]
+    processes:
+      - 风管制作
+      - 法兰制作
+      - 支吊架安装
+      - 风管吊装
+      - 法兰连接
+      - 漏风量测试
+      - 保温施工
+  - id: P-HV-002
+    name: 空调设备安装
+    discipline: HVAC
+    match:
+      category: EQUIPMENT
+      keywords: ["空调", "AHU", "FCU", "风机盘管", "机组"]
+    processes:
+      - 设备开箱检验
+      - 基础制作
+      - 设备就位
+      - 减振安装
+      - 管道连接
+      - 电气接线
+      - 单机试运转
+      - 系统调试

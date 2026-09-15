@@ -1,0 +1,90 @@
+# ============================================================
+# 工程材料词典 (Material Dictionary)
+# ============================================================
+# 用于从图纸文字标注中提取材料信息（NER）。
+# 每条规则定义：材料类别 + 匹配模式 + 提取字段。
+#
+# 字段说明：
+#   category  : 材料大类（混凝土/钢材/管材/电缆/保温/砌体/装饰/其他）
+#   pattern   : 正则表达式（Python re 语法），用于匹配文字标注
+#   fields    : 从匹配结果中提取的字段（正则捕获组名 -> 字段名）
+#   examples  : 示例文本（供人工核对）
+# ============================================================
+version: "1.0"
+materials:
+  # ---------------- 混凝土 ----------------
+  - category: 混凝土
+    pattern: '(?P<grade>C\d{2})\s*(?:混凝土|砼)?'
+    fields: {grade: 强度等级}
+    examples: ["C30混凝土", "C35砼", "C40"]
+  - category: 混凝土
+    pattern: '(?P<grade>C\d{2})\s*(?P<type>防水|抗渗|微膨胀|早强)?\s*(?:混凝土|砼)'
+    fields: {grade: 强度等级, type: 特殊类型}
+    examples: ["C30P6防水混凝土", "C35微膨胀混凝土"]
+  # ---------------- 钢材 ----------------
+  - category: 钢材
+    pattern: '(?P<grade>Q\d{3}[A-Z]?)\s*(?:钢板|型钢|钢)?'
+    fields: {grade: 牌号}
+    examples: ["Q235钢板", "Q345B型钢"]
+  - category: 钢材
+    pattern: '(?P<diameter>[ΦφΦ]\d{1,2})\s*@\s*(?P<spacing>\d{2,4})'
+    fields: {diameter: 钢筋直径, spacing: 间距}
+    examples: ["Φ12@200", "Φ8@150"]
+  - category: 钢材
+    pattern: '(?P<spec>HRB\d{3}|HPB\d{3}|HRBF\d{3})'
+    fields: {spec: 钢筋牌号}
+    examples: ["HRB400", "HPB300"]
+  # ---------------- 管材 ----------------
+  - category: 管材
+    pattern: '(?P<dn>DN\d{2,4})\s*(?P<material>镀锌钢管|焊接钢管|无缝钢管|铸铁管|PVC管|PPR管|PE管|铜管)?'
+    fields: {dn: 公称直径, material: 管材}
+    examples: ["DN100镀锌钢管", "DN50 PVC管"]
+  - category: 管材
+    pattern: '(?P<de>De\d{2,4})\s*(?P<material>PPR|PE|PVC)?'
+    fields: {de: 外径, material: 管材}
+    examples: ["De110 PPR管"]
+  - category: 管材
+    pattern: '(?P<spec>SC\d{2,3}|JDG\d{2,3}|KBG\d{2,3})'
+    fields: {spec: 电线管规格}
+    examples: ["SC50", "JDG20"]
+  # ---------------- 电缆电线 ----------------
+  - category: 电缆
+    pattern: '(?P<model>YJV|VV|BV|BVR|RVV|KVV|NH-YJV)\s*[-]?\s*(?P<spec>\d+[x×]\d+(?:\.\d+)?)?'
+    fields: {model: 型号, spec: 规格}
+    examples: ["YJV-4x25", "BV-2.5", "NH-YJV-3x120"]
+  - category: 电缆
+    pattern: '(?P<spec>\d+[x×]\d+(?:\.\d+)?)\s*(?P<model>mm²|平方)'
+    fields: {spec: 截面积}
+    examples: ["4x25mm²", "3x2.5平方"]
+  # ---------------- 保温材料 ----------------
+  - category: 保温
+    pattern: '(?P<material>岩棉|玻璃棉|橡塑|聚氨酯|挤塑板|聚苯板|XPS|EPS)\s*(?P<thickness>\d{2,3})?(?:mm)?'
+    fields: {material: 材料, thickness: 厚度}
+    examples: ["岩棉50mm", "橡塑保温", "XPS板"]
+  # ---------------- 砌体材料 ----------------
+  - category: 砌体
+    pattern: '(?P<material>加气混凝土砌块|蒸压加气块|烧结页岩砖|混凝土多孔砖|灰砂砖|轻质隔墙板)'
+    fields: {material: 材料}
+    examples: ["加气混凝土砌块", "蒸压加气块"]
+  - category: 砌体
+    pattern: '(?P<strength>MU\d{1,2}(?:\.\d)?)\s*(?P<material>砖|砌块)?'
+    fields: {strength: 强度等级, material: 材料}
+    examples: ["MU10砖", "MU5砌块"]
+  # ---------------- 装饰材料 ----------------
+  - category: 装饰
+    pattern: '(?P<material>瓷砖|地砖|石材|大理石|花岗岩|木地板|涂料|乳胶漆|壁纸|铝扣板|石膏板)'
+    fields: {material: 材料}
+    examples: ["800x800地砖", "乳胶漆墙面"]
+  - category: 装饰
+    pattern: '(?P<size>\d{3,4}[x×]\d{3,4})\s*(?P<material>地砖|瓷砖|石材)'
+    fields: {size: 规格, material: 材料}
+    examples: ["800x800地砖", "600x600瓷砖"]
+  # ---------------- 其他 ----------------
+  - category: 其他
+    pattern: '(?P<material>防水卷材|SBS|APP|聚氨酯防水涂料|水泥基渗透结晶)'
+    fields: {material: 材料}
+    examples: ["SBS防水卷材", "聚氨酯防水涂料"]
+  - category: 其他
+    pattern: '(?P<material>防火门|防火卷帘|防火窗)\s*(?P<level>甲级|乙级|丙级)?'
+    fields: {material: 材料, level: 防火等级}
+    examples: ["甲级防火门", "乙级防火门"]

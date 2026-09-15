@@ -1,0 +1,323 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://cad-insight/schemas/cad-insight-object.json",
+  "title": "CadInsightObject (CIO)",
+  "description": "全专业图纸解析数据标准契约。所有模块（感知/解析/分析/知识）之间的数据流转必须遵循本 Schema。",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "project_meta",
+    "parsed_entities",
+    "global_context"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "CIO 契约版本号，遵循语义化版本",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "project_meta": {
+      "type": "object",
+      "required": [
+        "project_id",
+        "discipline",
+        "drawing_type"
+      ],
+      "properties": {
+        "project_id": {
+          "type": "string",
+          "description": "项目标识。无项目号时使用文件名派生"
+        },
+        "discipline": {
+          "type": "string",
+          "enum": [
+            "ARCH",
+            "STR",
+            "HVAC",
+            "ELEC",
+            "PLUMB",
+            "SITE",
+            "DECO",
+            "MULTI",
+            "UNKNOWN"
+          ],
+          "description": "专业标识：建筑/结构/暖通/电气/给排水/总图/装饰/多专业/未知"
+        },
+        "drawing_type": {
+          "type": "string",
+          "enum": [
+            "FLOOR_PLAN",
+            "ELEVATION",
+            "SECTION",
+            "DETAIL",
+            "SYSTEM_DIAGRAM",
+            "SITE_PLAN",
+            "SCHEDULE",
+            "UNKNOWN"
+          ],
+          "description": "图纸类型：平面图/立面图/剖面图/详图/系统图/总平面图/表格/未知"
+        },
+        "source_file": {
+          "type": "string"
+        },
+        "dxf_version": {
+          "type": "string"
+        },
+        "discipline_confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "专业判定置信度百分比"
+        },
+        "discipline_evidence": {
+          "type": "object",
+          "description": "专业判定依据（图层/图块/文字）"
+        }
+      }
+    },
+    "parsed_entities": {
+      "type": "array",
+      "description": "解析出的实体列表",
+      "items": {
+        "type": "object",
+        "required": [
+          "entity_id",
+          "category",
+          "geometry"
+        ],
+        "properties": {
+          "entity_id": {
+            "type": "string",
+            "description": "实体唯一标识（uuid4 或确定性哈希）"
+          },
+          "category": {
+            "type": "string",
+            "description": "实体类别：WALL/DOOR/WINDOW/VALVE/PIPE/EQUIPMENT/TEXT/DIMENSION/UNKNOWN 等"
+          },
+          "sub_category": {
+            "type": "string",
+            "description": "细分类型，如 GATE_VALVE（闸阀）"
+          },
+          "geometry": {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "POINT",
+                  "LINE",
+                  "POLYLINE",
+                  "POLYGON",
+                  "CIRCLE",
+                  "ARC",
+                  "TEXT",
+                  "BLOCK_REF",
+                  "UNKNOWN"
+                ]
+              },
+              "coordinates": {
+                "type": "array",
+                "description": "绝对坐标序列。POINT 为单点，LINE 为两点，POLYGON 为顶点序列",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  }
+                }
+              },
+              "bbox": {
+                "type": "array",
+                "description": "边界框 [x_min, y_min, x_max, y_max]",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 4,
+                "maxItems": 4
+              },
+              "radius": {
+                "type": "number"
+              },
+              "closed": {
+                "type": "boolean"
+              }
+            }
+          },
+          "attributes": {
+            "type": "object",
+            "description": "结构化属性",
+            "properties": {
+              "label_text": {
+                "type": "string",
+                "description": "识别到的文字标签"
+              },
+              "layer_name": {
+                "type": "string",
+                "description": "原始 CAD 图层"
+              },
+              "block_name": {
+                "type": "string",
+                "description": "图块名（块参照时）"
+              },
+              "dxf_type": {
+                "type": "string",
+                "description": "原始 DXF 实体类型"
+              },
+              "height": {
+                "type": "number"
+              },
+              "rotation": {
+                "type": "number"
+              },
+              "scale": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              },
+              "raw_attribs": {
+                "type": "object",
+                "description": "图块属性原始键值对"
+              }
+            },
+            "additionalProperties": true
+          },
+          "topology": {
+            "type": "object",
+            "description": "拓扑关系（由解析层补全）",
+            "properties": {
+              "connected_to": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "关联实体的 entity_id 列表"
+              },
+              "relation": {
+                "type": "string",
+                "description": "关系类型，如 FLOW_OUT / CONTAINS / NEAR"
+              }
+            }
+          },
+          "validation_errors": {
+            "type": "array",
+            "description": "分析层追加的校验错误（分析层只读不修改，仅追加此字段）",
+            "items": {
+              "type": "object",
+              "properties": {
+                "rule_id": {
+                  "type": "string"
+                },
+                "severity": {
+                  "type": "string",
+                  "enum": [
+                    "error",
+                    "warning",
+                    "info"
+                  ]
+                },
+                "message": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "global_context": {
+      "type": "object",
+      "properties": {
+        "scale_ratio": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "图纸比例（如 0.01 表示 1:100），未识别时为 null"
+        },
+        "elevation_base": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "基准标高，如 +0.000，未识别时为 null"
+        },
+        "units": {
+          "type": "string"
+        },
+        "extents": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "min": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "max": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "width": {
+              "type": "number"
+            },
+            "height": {
+              "type": "number"
+            }
+          }
+        },
+        "layer_summary": {
+          "type": "object",
+          "description": "图层 -> 实体数 映射"
+        },
+        "legend_entries": {
+          "type": "array",
+          "description": "图例条目"
+        },
+        "layers_off": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "被关闭的图层"
+        },
+        "layers_frozen": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "被冻结的图层"
+        },
+        "block_definitions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "用户块定义清单"
+        }
+      }
+    },
+    "validation_summary": {
+      "type": "object",
+      "description": "分析层汇总的校验结果",
+      "properties": {
+        "total_errors": {
+          "type": "integer"
+        },
+        "total_warnings": {
+          "type": "integer"
+        },
+        "rules_executed": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,175 @@
+# ============================================================
+# CAD 审图规则库 (Rule DSL)
+# ============================================================
+# 规则采用「条件 + 动作」结构，工程师可直接增删改，无需修改代码。
+#
+# 字段说明：
+#   id          : 规则唯一标识
+#   name        : 规则名称（中文）
+#   category    : 规则分类（geometry / layer / text / block / topology / cross_discipline）
+#   severity    : 严重级别（error / warning / info）
+#   enabled     : 是否启用
+#   condition   : 触发条件（见下方算子说明）
+#   action      : 命中后的提示信息
+#   reference   : 规范依据（可选）
+#
+# condition 算子：
+#   entity_count_gt / entity_count_lt   : 实体数量比较
+#   layer_entity_count_zero             : 图层实体数为 0
+#   layer_name_matches                  : 图层名匹配正则
+#   entity_on_layer                     : 实体位于指定图层
+#   entity_type_count_gt                : 指定实体类型数量超过阈值
+#   text_height_lt                      : 文字高度小于阈值
+#   block_attr_empty                    : 图块属性为空
+#   zero_length_line                    : 零长度直线
+#   zero_radius_circle                  : 零半径圆
+#   unused_block_definition             : 未使用的块定义
+#   duplicate_entity                    : 重复实体
+#   entity_bbox_overlap                 : 实体包围盒重叠（碰撞）
+#   layer_pair_distance_lt              : 两图层构件间距小于阈值
+#   discipline_mismatch                 : 专业与内容不匹配
+# ============================================================
+version: "1.0"
+rules:
+  # ---------------- 几何规范 ----------------
+  - id: GEO001
+    name: 零长度直线
+    category: geometry
+    severity: warning
+    enabled: true
+    condition:
+      operator: zero_length_line
+      threshold: 1.0e-6
+    action: "发现 {count} 条起终点重合的 LINE，属于无效图元，建议清理"
+    reference: "制图规范：不应存在零长度图元"
+  - id: GEO002
+    name: 零半径圆
+    category: geometry
+    severity: warning
+    enabled: true
+    condition:
+      operator: zero_radius_circle
+      threshold: 1.0e-6
+    action: "发现 {count} 个半径近似为 0 的 CIRCLE，建议清理"
+  - id: GEO003
+    name: 极短线段
+    category: geometry
+    severity: info
+    enabled: true
+    condition:
+      operator: short_line
+      threshold: 0.1
+    action: "发现 {count} 条长度小于 {threshold} 图形单位的线段，可能是误操作残留"
+  - id: GEO004
+    name: 重复实体
+    category: geometry
+    severity: info
+    enabled: true
+    condition:
+      operator: duplicate_entity
+      threshold: 1.0e-6
+    action: "发现 {count} 组位置完全重合的同类实体，建议核查是否重复绘制"
+  # ---------------- 图层规范 ----------------
+  - id: LAY001
+    name: 未使用图层
+    category: layer
+    severity: info
+    enabled: true
+    condition:
+      operator: layer_entity_count_zero
+      exclude: ["0", "Defpoints"]
+    action: "共 {count} 个图层无任何实体，建议清理以减小文件体积"
+  - id: LAY002
+    name: 实体位于 0 图层
+    category: layer
+    severity: info
+    enabled: true
+    condition:
+      operator: entity_on_layer
+      layer: "0"
+    action: "发现 {count} 个实体位于默认图层 0，建议按专业归入专用图层"
+    reference: "制图规范：实体应归入对应专业图层"
+  - id: LAY003
+    name: 图层被关闭
+    category: layer
+    severity: info
+    enabled: true
+    condition:
+      operator: layer_is_off
+      exclude: ["Defpoints"]
+    action: "{count} 个图层处于关闭状态，交付前建议检查是否遗漏内容"
+  - id: LAY004
+    name: 图层被冻结
+    category: layer
+    severity: info
+    enabled: true
+    condition:
+      operator: layer_is_frozen
+    action: "{count} 个图层处于冻结状态，交付前建议解冻核查"
+  - id: LAY005
+    name: 图层命名不规范
+    category: layer
+    severity: info
+    enabled: true
+    condition:
+      operator: layer_name_matches
+      pattern: "^(图层\\d+|Layer\\d+|新建图层|New Layer)$"
+    action: "发现 {count} 个图层使用默认/无意义命名，建议按专业规范重命名"
+  # ---------------- 文字规范 ----------------
+  - id: TXT001
+    name: 文字高度过小
+    category: text
+    severity: info
+    enabled: true
+    condition:
+      operator: text_height_lt
+      threshold: 0.5
+    action: "{count} 处文字高度小于 {threshold} 图形单位，可能影响打印可读性"
+  - id: TXT002
+    name: 文字内容为空
+    category: text
+    severity: warning
+    enabled: true
+    condition:
+      operator: empty_text
+    action: "发现 {count} 个空文字对象，建议清理"
+  # ---------------- 图块规范 ----------------
+  - id: BLK001
+    name: 图块属性为空
+    category: block
+    severity: warning
+    enabled: true
+    condition:
+      operator: block_attr_empty
+    action: "{count} 个带属性图块的属性值为空，可能影响设备/材料统计"
+  - id: BLK002
+    name: 未使用的块定义
+    category: block
+    severity: info
+    enabled: true
+    condition:
+      operator: unused_block_definition
+    action: "发现 {count} 个已定义但从未插入的图块，建议清理"
+  # ---------------- 跨专业一致性（示例规则，需按项目启用）----------------
+  - id: CRS001
+    name: 专业与图层命名不匹配
+    category: cross_discipline
+    severity: info
+    enabled: false
+    condition:
+      operator: discipline_mismatch
+      expected_discipline: "ELEC"
+      forbidden_keywords: ["给水", "排水", "风管"]
+    action: "图纸判定为电气专业，但发现 {count} 处给排水/暖通相关图层，请确认是否多专业综合图"
+  - id: CRS002
+    name: 构件空间碰撞
+    category: cross_discipline
+    severity: error
+    enabled: false
+    condition:
+      operator: entity_bbox_overlap
+      layer_a_keywords: ["风管", "DUCT", "给水", "排水", "PIPE"]
+      layer_b_keywords: ["梁", "BEAM", "柱", "COLUMN"]
+      tolerance: 0.0
+    action: "发现 {count} 处管线与结构构件包围盒重叠，可能存在碰撞，需核查标高"
+    reference: "GB 50019 / GB 50015：管线与结构应保持安全净距"
