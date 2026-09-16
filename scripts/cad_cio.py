@@ -108,6 +108,40 @@ def _make_entity_id(dxf_handle: str, dxf_type: str, layer: str, index: int) -> s
     """生成确定性 entity_id：优先用 DXF handle，无则用内容哈希。"""
     seed = f"{dxf_handle}|{dxf_type}|{layer}|{index}"
     return hashlib.md5(seed.encode("utf-8")).hexdigest()
+# 单字中文关键词的「排除前缀」：命中字前面是这些字时不算
+# 例：「钢板」的「板」不应命中 SLAB（板）、「阀门」不受影响因为词边界已在
+KEYWORD_EXCLUDE_PREFIX = {
+    "板": ("钢", "铁", "铜", "铝", "木", "皮", "垫", "脚"),
+    "门": ("阀", "闸", "炉"),
+    "梁": ("抬", "挑"),
+    "柱": ("支", "顶"),
+}
+def _kw_match(keyword: str, text: str) -> bool:
+    """关键词匹配：中文按子串（含复合词保护），英文按词边界。
+    - 「Q235钢板」不应命中「板」（前面是「钢」）
+    - 「阀门」不应命中「门」（前面是「阀」）
+    - 「Q235_PLATE」不命中英文 PANEL 之类的子串
+    """
+    kw = keyword.upper().strip()
+    t = text.upper()
+    if not kw:
+        return False
+    if re.search(r"[\u4e00-\u9fff]", kw):
+        start = 0
+        while True:
+            idx = t.find(kw, start)
+            if idx == -1:
+                return False
+            # 检查排除前缀（针对单字关键词）
+            if idx > 0:
+                prev_char = t[idx - 1]
+                excluded = KEYWORD_EXCLUDE_PREFIX.get(kw, ())
+                if prev_char in excluded:
+                    start = idx + 1
+                    continue
+            return True
+    pattern = r"(?<![A-Z0-9])" + re.escape(kw) + r"(?![A-Z0-9])"
+    return re.search(pattern, t) is not None
 def _match_sub(haystack: str):
     """匹配细分类型。"""
     up = _norm(haystack)
@@ -124,21 +158,18 @@ def _classify(layer: str, block_name: str, text: str) -> tuple:
     if block_name:
         bn = _norm(block_name)
         for cat, _, kws in CATEGORY_RULES:
-            for kw in kws:
-                if _norm(kw) in bn:
-                    return cat, _match_sub(f"{block_name} {text}")
+            if any(_kw_match(kw, bn) for kw in kws):
+                return cat, _match_sub(f"{block_name} {text}")
     if text:
         tx = _norm(text)
         for cat, _, kws in CATEGORY_RULES:
-            for kw in kws:
-                if _norm(kw) in tx:
-                    return cat, _match_sub(f"{block_name} {text}")
+            if any(_kw_match(kw, tx) for kw in kws):
+                return cat, _match_sub(f"{block_name} {text}")
     if layer:
         ly = _norm(layer)
         for cat, _, kws in CATEGORY_RULES:
-            for kw in kws:
-                if _norm(kw) in ly:
-                    return cat, _match_sub(f"{layer} {block_name} {text}")
+            if any(_kw_match(kw, ly) for kw in kws):
+                return cat, _match_sub(f"{layer} {block_name} {text}")
     return "UNKNOWN", None
 # ---------------------------------------------------------------- 几何提取
 def _extract_geometry(e) -> dict:
@@ -185,6 +216,18 @@ def _extract_geometry(e) -> dict:
                     "bbox": [_round(ins[0]), _round(ins[1]), _round(ins[0]), _round(ins[1])]}
         if t == "INSERT":
             ins = _dxf_attr(e, "insert", (0, 0, 0))
+            # 展开块几何获取真实包围盒（否则碰撞检测对图块永远漏检）
+            try:
+                from ezdxf import bbox as _ezbbox
+                # 注意：extents 入参必须是实体可迭代对象，传单实体会抛
+                # TypeError（'Insert' object is not iterable），必须包成 [e]
+                ext = _ezbbox.extents([e], fast=True)
+                if ext.has_data:
+                    return {"type": "BLOCK_REF", "coordinates": [[_round(ins[0]), _round(ins[1])]],
+                            "bbox": [_round(ext.extmin.x), _round(ext.extmin.y),
+                                     _round(ext.extmax.x), _round(ext.extmax.y)]}
+            except Exception:
+                pass
             return {"type": "BLOCK_REF", "coordinates": [[_round(ins[0]), _round(ins[1])]],
                     "bbox": [_round(ins[0]), _round(ins[1]), _round(ins[0]), _round(ins[1])]}
         if t == "POINT":
@@ -233,12 +276,19 @@ DISCIPLINE_KEYWORDS = {
 # 图层名前缀 → 专业映射（行业通用制图规范）
 # 建筑 A、结构 S、给排水 P、暖通 M、电气 E、总图 L
 LAYER_PREFIX_MAP = {
+    # 完整单词直接映射（无分隔符时防误判）
+    "WALL": "ARCH", "DOOR": "ARCH", "WINDOW": "ARCH", "AXIS": "ARCH",
+    "COLUMN": "STR", "BEAM": "STR", "SLAB": "STR", "REBAR": "STR",
+    "LIGHT": "ELEC", "SOCKET": "ELEC", "POWER": "ELEC", "ELEC": "ELEC",
+    "WATER": "PLUMB", "DRAIN": "PLUMB", "PIPE": "PLUMB",
+    "DUCT": "HVAC", "HVAC": "HVAC",
+    # 单/双字母前缀（仅在 A-xxx 分隔结构下生效）
     "A": "ARCH", "AR": "ARCH", "ARCH": "ARCH",
     "S": "STR", "ST": "STR", "STR": "STR", "GS": "STR",
-    "P": "PLUMB", "PL": "PLUMB", "W": "PLUMB", "PLUMB": "PLUMB",
+    "P": "PLUMB", "PL": "PLUMB", "PLUMB": "PLUMB",
     "M": "HVAC", "HV": "HVAC", "HVAC": "HVAC",
     "E": "ELEC", "EL": "ELEC", "ELEC": "ELEC",
-    "L": "SITE", "LA": "SITE",
+    "L": "SITE", "LA": "SITE", "SITE": "SITE",
 }
 def _detect_by_layer_prefix(layers: list) -> tuple:
     """按图层名前缀判定专业（如 A-WALL → 建筑）。返回 (专业, 命中图层列表)。"""
@@ -246,11 +296,22 @@ def _detect_by_layer_prefix(layers: list) -> tuple:
     for lname in layers:
         name = (lname or "").strip().upper()
         parts = re.split(r"[-_\s]", name)
-        prefix = parts[0] if parts and parts[0] else name
-        for cand in (prefix, prefix[:2], prefix[:1]):
-            if cand and cand in LAYER_PREFIX_MAP:
-                scores[LAYER_PREFIX_MAP[cand]].append(lname)
-                break
+        has_sep = len(parts) > 1 and bool(parts[0])
+        prefix = parts[0] if has_sep else name
+        # 单/双字母前缀必须出现在「前缀-后缀」结构中（如 A-WALL、S-COLUMN），
+        # 否则 LIGHT、WALL 这类完整单词会被首字母误判（L→总图、W→给排水）
+        candidates = []
+        if has_sep:
+            if len(prefix) <= 2 and prefix in LAYER_PREFIX_MAP:
+                candidates.append(prefix)
+            elif prefix in LAYER_PREFIX_MAP:
+                candidates.append(prefix)
+        # 完整单词映射（不分隔符也认）：如 WALL/AXIS 直接命中
+        if name in LAYER_PREFIX_MAP:
+            candidates.append(name)
+        for cand in candidates:
+            scores[LAYER_PREFIX_MAP[cand]].append(lname)
+            break
     if not scores:
         return None, []
     best = max(scores.items(), key=lambda x: len(x[1]))
@@ -390,6 +451,8 @@ class CioConverter:
         except Exception:
             pass
         layer_summary = Counter(_dxf_attr(e, "layer", "0") for e in self.msp)
+        # 全量图层清单（LAY001 空图层规则需要：全量 - 已用 = 空图层）
+        all_layer_names = [l.dxf.name for l in self.doc.layers]
         units_code = self.doc.header.get("$INSUNITS", 0) or 0
         units_map = {0: "unitless", 1: "inch", 2: "foot", 4: "mm", 5: "cm", 6: "m"}
         # 图层状态（供规则引擎使用）
@@ -408,6 +471,7 @@ class CioConverter:
             "units": units_map.get(units_code, f"code_{units_code}"),
             "extents": extents,
             "layer_summary": dict(layer_summary),
+            "all_layers": all_layer_names,
             "layers_off": layers_off,
             "layers_frozen": layers_frozen,
             "block_definitions": block_defs,
@@ -421,15 +485,73 @@ class CioConverter:
             "global_context": global_context,
             "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         }
-    def _build_topology(self, entities: list, tolerance: float = 3000.0):
-        """基于空间邻近为实体补全 topology.connected_to。"""
-        # 只对非文字实体做拓扑（文字作为标签不参与连接）
+    def _build_topology(self, entities: list, tolerance: float = 1.0):
+        """为实体补全物理拓扑 connected_to。
+        两类关系：
+          CONNECTED — 几何端点共点/极近（管线真实连通，如电线接配电箱端子）
+          NEAR      — 空间邻近（配套关系，弱于连通）
+        线类实体（LINE/POLYLINE）取两端点参与共点判定；点类实体取插入点。
+        """
+        # 线类：收集端点；点类：收集坐标
+        point_idx = {}   # 网格键 -> [(entity, endpoint)]
+        def _grid_key(pt, cell=50.0):
+            return (int(pt[0] // cell), int(pt[1] // cell))
+        line_entities = []
+        for e in entities:
+            if e.get("category") in ("TEXT", "DIMENSION", "AXIS", "UNKNOWN"):
+                continue
+            g = e.get("geometry", {})
+            gtype = g.get("type", "")
+            coords = g.get("coordinates", [])
+            if gtype in ("LINE", "POLYLINE", "POLYGON") and len(coords) >= 2:
+                # 取线段两端点
+                line_entities.append((e, [tuple(coords[0]), tuple(coords[-1])]))
+            elif gtype in ("BLOCK_REF", "CIRCLE", "ARC", "POINT") and coords:
+                pt = tuple(coords[0])
+                k = _grid_key(pt)
+                point_idx.setdefault(k, []).append((e, pt))
+        # 1. 端点共点 → CONNECTED（真实物理连通）
+        #    线端点与线端点、线端点与设备点
+        for e, endpoints in line_entities:
+            conns = set()
+            for pt in endpoints:
+                k = _grid_key(pt)
+                # 检查本格及邻格
+                for dx in (-1, 0, 1):
+                    for dy in (-1, 0, 1):
+                        for other, opt in point_idx.get((k[0]+dx, k[1]+dy), []):
+                            if other is e:
+                                continue
+                            try:
+                                if math.dist(pt, opt) <= tolerance:
+                                    conns.add(other["entity_id"])
+                            except Exception:
+                                continue
+            # 线与线端点共点
+            for other, other_ends in line_entities:
+                if other is e:
+                    continue
+                for opt in other_ends:
+                    for pt in endpoints:
+                        try:
+                            if math.dist(pt, opt) <= tolerance:
+                                conns.add(other["entity_id"])
+                                break
+                        except Exception:
+                            continue
+            if conns:
+                e["topology"] = {
+                    "connected_to": list(conns)[:15],
+                    "relation": "CONNECTED",
+                }
+        # 2. 空间邻近 → NEAR（仅在无 CONNECTED 时补充，限制规模）
         candidates = [e for e in entities
                       if e["category"] not in ("TEXT", "DIMENSION", "AXIS", "UNKNOWN")
-                      and e["geometry"].get("coordinates")]
-        # 限制规模，避免 O(n²) 爆炸
+                      and e.get("geometry", {}).get("coordinates")
+                      and "topology" not in e]
         if len(candidates) > 400:
             candidates = candidates[:400]
+        near_tolerance = 3000.0
         for i, a in enumerate(candidates):
             pa = a["geometry"]["coordinates"][0]
             conns = []
@@ -441,7 +563,7 @@ class CioConverter:
                     d = math.dist(pa, pb)
                 except Exception:
                     continue
-                if d <= tolerance:
+                if d <= near_tolerance:
                     conns.append((b["entity_id"], d))
             if conns:
                 conns.sort(key=lambda x: x[1])

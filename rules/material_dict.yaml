@@ -14,22 +14,18 @@ version: "1.0"
 materials:
   # ---------------- 混凝土 ----------------
   - category: 混凝土
-    pattern: '(?P<grade>C\d{2})\s*(?:混凝土|砼)?'
-    fields: {grade: 强度等级}
-    examples: ["C30混凝土", "C35砼", "C40"]
-  - category: 混凝土
-    pattern: '(?P<grade>C\d{2})\s*(?P<type>防水|抗渗|微膨胀|早强)?\s*(?:混凝土|砼)'
-    fields: {grade: 强度等级, type: 特殊类型}
-    examples: ["C30P6防水混凝土", "C35微膨胀混凝土"]
+    pattern: '(?P<grade>C\d{2})\s*(?P<permeability>P[468])?\s*(?P<type>防水|抗渗|微膨胀|早强)?\s*(?:混凝土|砼)?'
+    fields: {grade: 强度等级, permeability: 抗渗等级, type: 特殊类型}
+    examples: ["C30混凝土", "C35砼", "C40", "C30P6防水混凝土"]
   # ---------------- 钢材 ----------------
   - category: 钢材
     pattern: '(?P<grade>Q\d{3}[A-Z]?)\s*(?:钢板|型钢|钢)?'
     fields: {grade: 牌号}
     examples: ["Q235钢板", "Q345B型钢"]
   - category: 钢材
-    pattern: '(?P<diameter>[ΦφΦ]\d{1,2})\s*@\s*(?P<spacing>\d{2,4})'
+    pattern: '(?P<diameter>(?:[ΦφΦ]|%%c)\d{1,2})\s*[@％%]\s*(?P<spacing>\d{2,4})'
     fields: {diameter: 钢筋直径, spacing: 间距}
-    examples: ["Φ12@200", "Φ8@150"]
+    examples: ["Φ12@200", "Φ8@150", "%%c12@200"]
   - category: 钢材
     pattern: '(?P<spec>HRB\d{3}|HPB\d{3}|HRBF\d{3})'
     fields: {spec: 钢筋牌号}
@@ -88,3 +84,23 @@ materials:
     pattern: '(?P<material>防火门|防火卷帘|防火窗)\s*(?P<level>甲级|乙级|丙级)?'
     fields: {material: 材料, level: 防火等级}
     examples: ["甲级防火门", "乙级防火门"]
+  - category: 钢材
+    pattern: '(?P<grade>\d+\.\d+级)?\s*(?P<bolt>M\d{1,2})\s*(?P<length>[x×]\d+)?\s*(?:螺栓)?'
+    fields: {grade: 性能等级, bolt: 螺栓规格, length: 长度}
+    examples: ["8.8级M16螺栓", "M16", "M20x80"]
+  - category: 设备
+    pattern: '(?P<model>XL-?\d+|GGD\d*|PZ\d+)\s*(?:型)?\s*(?:配电箱|柜|控制箱)?'
+    fields: {model: 设备型号}
+    examples: ["XL-21", "XL-21配电箱", "GGD3"]
+  - category: 钢材
+    pattern: '(?P<spec>\d{2,4}x\d{2,4}(?:x\d{1,2}(?:\.\d)?)?)\s*(?P<shape>方管|方通|矩形管|角钢|槽钢|工字钢|H型钢)?'
+    fields: {spec: 型钢规格, shape: 型钢类型}
+    examples: ["40x40x3方管", "50x50方通"]
+  - category: 砌体
+    pattern: '(?P<grade>M\d{1,2}(?:\.\d)?)\s*(?P<material>混合砂浆|水泥砂浆|砌筑砂浆)'
+    fields: {grade: 强度等级, material: 砂浆类型}
+    examples: ["M7.5混合砂浆", "M5水泥砂浆"]
+  - category: 电缆
+    pattern: '(?P<model>YJV|VV|NH-YJV)\s*[-]?\s*(?P<spec>\d+[x×]\d+(?:\.\d+)?\+\d+[x×]\d+(?:\.\d+)?)'
+    fields: {model: 型号, spec: 相线+地线规格}
+    examples: ["YJV-4x25+1x16", "NH-YJV-3x120+1x70"]

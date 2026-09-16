@@ -62,12 +62,9 @@ class MaterialExtractor:
                     for m in p["regex"].finditer(text):
                         fields = {}
                         for gname, fname in p["fields"].items():
-                            try:
-                                val = m.group(gname)
-                                if val:
-                                    fields[fname] = val
-                            except (IndexError, error_group := Exception):
-                                pass
+                            val = m.groupdict().get(gname)
+                            if val:
+                                fields[fname] = val
                         if not fields:
                             continue
                         hits.append({

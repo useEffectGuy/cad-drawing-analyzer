@@ -212,6 +212,32 @@ class GraphQuery:
             return self._query_count(kw)
         # 兜底：关键词检索
         return self._query_find(q)
+    def _connected_neighbors(self, node: str, max_hops: int = 3) -> dict:
+        """沿物理边（CONNECTED/NEAR）做多跳遍历。
+        出边+入边都走：管线连通是无向的，不能被有向组织边挡住。"""
+        visited = {node: (0, "SELF")}
+        frontier = [node]
+        for depth in range(1, max_hops + 1):
+            next_frontier = []
+            for cur in frontier:
+                neighbors = set(self.G.successors(cur)) | set(self.G.predecessors(cur))
+                for nb in neighbors:
+                    if nb in visited:
+                        continue
+                    # 边可能存在于任一方向，两方向都尝试
+                    rel = ""
+                    if self.G.has_edge(cur, nb):
+                        rel = self.G.edges[cur, nb].get("relation", "")
+                    elif self.G.has_edge(nb, cur):
+                        rel = self.G.edges[nb, cur].get("relation", "")
+                    if rel in ("CONNECTED", "NEAR"):
+                        visited[nb] = (depth, rel)
+                        next_frontier.append(nb)
+            frontier = next_frontier
+            if not frontier:
+                break
+        visited.pop(node, None)
+        return visited
     def _query_connected(self, anchor_kw: str, target_kw: str) -> dict:
         anchors = self._find_nodes(anchor_kw)
         if not anchors:
@@ -219,31 +245,24 @@ class GraphQuery:
                     "nodes": [], "paths": []}
         results = []
         for a in anchors:
-            # 多跳遍历（最多 3 跳）
-            for depth in range(1, 4):
-                try:
-                    paths = nx.single_source_shortest_path_length(self.G, a, cutoff=depth)
-                except Exception:
-                    continue
-                for n, dist in paths.items():
-                    if dist == 0:
-                        continue
-                    d = self.G.nodes[n]
-                    blob = " ".join(str(d.get(k, "")) for k in
-                                    ("name", "label", "category", "sub_category", "block_name")).upper()
-                    tkws = [k.upper() for k in _expand_keywords(target_kw)]
-                    # 结构化字段优先匹配
-                    sblob = " ".join(str(d.get(k, "")) for k in
-                                     ("block_name", "category", "sub_category", "name"))
-                    if any(_token_match(k, sblob) for k in tkws):
-                        results.append({
-                            "anchor": self.G.nodes[a].get("label") or anchor_kw,
-                            "anchor_id": a,
-                            "target": d.get("label") or d.get("name") or n,
-                            "target_id": n,
-                            "hops": dist,
-                            "relation_path": self._describe_path(a, n),
-                        })
+            # 沿物理边多跳遍历（CONNECTED 优先语义，NEAR 降级）
+            neighbors = self._connected_neighbors(a, max_hops=3)
+            for n, (dist, etype) in neighbors.items():
+                d = self.G.nodes[n]
+                tkws = [k.upper() for k in _expand_keywords(target_kw)]
+                # 结构化字段优先匹配
+                sblob = " ".join(str(d.get(k, "")) for k in
+                                 ("block_name", "category", "sub_category", "name"))
+                if any(_token_match(k, sblob) for k in tkws):
+                    results.append({
+                        "anchor": self.G.nodes[a].get("label") or anchor_kw,
+                        "anchor_id": a,
+                        "target": d.get("label") or d.get("name") or n,
+                        "target_id": n,
+                        "hops": dist,
+                        "edge_type": etype,
+                        "relation_path": etype,
+                    })
         if not results:
             return {"answer": f"未找到与「{anchor_kw}」相连的「{target_kw}」。",
                     "nodes": [], "paths": []}

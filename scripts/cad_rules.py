@@ -49,8 +49,14 @@ def _op_zero_radius_circle(cio, cond):
             if e.get("geometry", {}).get("type") == "CIRCLE"
             and (e["geometry"].get("radius") or 0) < thr]
     return len(hits), hits, {}
+def _get_unit_scale(cio) -> float:
+    """按 CIO 单位返回阈值换算系数（把"米级默认阈值"适配到图形单位）。
+    毫米图纸：0.1 的极短线阈值应放大 1000 倍。"""
+    units = cio.get("global_context", {}).get("units", "unitless")
+    return {"mm": 1000.0, "cm": 100.0, "m": 1.0,
+            "inch": 39.37, "foot": 3.28}.get(units, 1.0)
 def _op_short_line(cio, cond):
-    thr = cond.get("threshold", 0.1)
+    thr = cond.get("threshold", 0.1) * _get_unit_scale(cio)
     hits = []
     for e in cio["parsed_entities"]:
         g = e.get("geometry", {})
@@ -79,10 +85,12 @@ def _op_duplicate_entity(cio, cond):
     return len(dups), hits, {}
 def _op_layer_entity_count_zero(cio, cond):
     exclude = set(cond.get("exclude", []))
-    layer_summary = cio.get("global_context", {}).get("layer_summary", {})
-    # 从实体推断所有图层
-    all_layers = set(layer_summary.keys())
-    hits = [l for l in all_layers if layer_summary.get(l, 0) == 0 and l not in exclude]
+    gc = cio.get("global_context", {})
+    layer_summary = gc.get("layer_summary", {})
+    # 全量图层（doc.layers）- 已用图层（出现在实体中）= 空图层
+    all_layers = gc.get("all_layers") or list(layer_summary.keys())
+    used = {l for l, c in layer_summary.items() if c > 0}
+    hits = [l for l in all_layers if l not in used and l not in exclude]
     return len(hits), hits, {"layers": hits[:20]}
 def _op_entity_on_layer(cio, cond):
     layer = cond.get("layer", "0")
@@ -108,7 +116,7 @@ def _op_layer_name_matches(cio, cond):
     hits = [l for l in layer_summary if rx.match(l)]
     return len(hits), hits, {"layers": hits[:20]}
 def _op_text_height_lt(cio, cond):
-    thr = cond.get("threshold", 0.5)
+    thr = cond.get("threshold", 0.5) * _get_unit_scale(cio)
     hits = []
     for e in cio["parsed_entities"]:
         if e.get("attributes", {}).get("dxf_type") in ("TEXT", "MTEXT"):
@@ -196,6 +204,30 @@ def _op_layer_pair_distance_lt(cio, cond):
             except Exception:
                 pass
     return len(hits) // 2, list(set(hits)), {"threshold": thr}
+# ---------------- 补充算子 ----------------
+def _op_entity_count_gt(cio, cond):
+    """实体总数超过阈值。"""
+    thr = cond.get("threshold", 0)
+    total = len(cio.get("parsed_entities", []))
+    if total > thr:
+        return total, [], {"count": total}
+    return 0, [], {}
+def _op_entity_count_lt(cio, cond):
+    """实体总数低于阈值。"""
+    thr = cond.get("threshold", 0)
+    total = len(cio.get("parsed_entities", []))
+    if total < thr:
+        return total, [], {"count": total}
+    return 0, [], {}
+def _op_entity_type_count_gt(cio, cond):
+    """指定实体类型数量超过阈值。"""
+    dxf_type = cond.get("dxf_type", "")
+    thr = cond.get("threshold", 0)
+    cnt = sum(1 for e in cio.get("parsed_entities", [])
+              if e.get("attributes", {}).get("dxf_type") == dxf_type)
+    if cnt > thr:
+        return cnt, [], {"count": cnt}
+    return 0, [], {}
 # 算子注册表
 OPERATORS = {
     "zero_length_line": _op_zero_length_line,
@@ -214,6 +246,9 @@ OPERATORS = {
     "entity_bbox_overlap": _op_entity_bbox_overlap,
     "discipline_mismatch": _op_discipline_mismatch,
     "layer_pair_distance_lt": _op_layer_pair_distance_lt,
+    "entity_count_gt": _op_entity_count_gt,
+    "entity_count_lt": _op_entity_count_lt,
+    "entity_type_count_gt": _op_entity_type_count_gt,
 }
 # ---------------------------------------------------------------- 规则引擎
 class RuleEngine:
@@ -270,8 +305,12 @@ class RuleEngine:
                     "message": "符合规范",
                 })
                 continue
-            # 渲染 action 模板
-            msg = rule.get("action", "").format(count=count, **extra)
+            # 渲染 action 模板（模板变量缺失不应整轮崩溃）
+            try:
+                msg = rule.get("action", "").format(count=count, **extra)
+            except (KeyError, IndexError, ValueError) as ex:
+                msg = f'{rule.get("action", "")}（模板渲染失败: {ex}，命中 {count} 处）'
+                msg = msg.split("（模板渲染失败")[0] + f"，命中 {count} 处"
             results.append({
                 "rule_id": rule["id"],
                 "name": rule["name"],

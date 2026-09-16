@@ -17,6 +17,7 @@
 from __future__ import annotations
 import argparse
 import json
+import re
 import math
 import os
 import sys
@@ -154,6 +155,10 @@ class ProcessEngine:
             "单机试运转": 32, "系统调试": 33, "防腐保温": 34, "防腐涂装": 34,
             "保温施工": 34, "试压验收": 35, "密封打胶": 35, "打胶密封": 35,
             "水枪水带配置": 35, "洞口预留": 1, "洞口修整": 2,
+            # 安装前检验类（应在安装工序之前）
+            "阀门检验": 19, "灯具检验": 19, "设备开箱检验": 19,
+            # 管路/接线准备类
+            "穿引线": 22, "接线盒预埋": 4, "电气接线": 24,
             "门窗框安装": 3, "窗框安装": 3, "门窗扇安装": 4, "玻璃安装": 4,
         }
         # 汇总所有工序，按施工顺序排序
@@ -268,7 +273,19 @@ def main():
         sys.exit(2)
     with open(args.cio, encoding="utf-8") as f:
         cio = json.load(f)
-    result = ProcessEngine(rules_path).run(cio)
+    engine = ProcessEngine(rules_path)
+    result = engine.run(cio)
+    # 一致性校验：YAML 工序是否全部在顺序表中登记
+    src_self = open(os.path.abspath(__file__), encoding="utf-8").read()
+    m = re.search(r"SEQUENCE_ORDER\s*=\s*\{(.*?)\}", src_self, re.S)
+    reg = set(re.findall(r'"([^"]+)"\s*:', m.group(1))) if m else set()
+    yaml_procs = set()
+    for rule in engine.rules:
+        yaml_procs.update(rule.get("processes", []))
+    missing = yaml_procs - reg
+    if missing:
+        print(f"[WARN] 以下 {len(missing)} 个工序未在 SEQUENCE_ORDER 登记（按默认顺序处理）:", file=sys.stderr)
+        print("       " + "、".join(sorted(missing)), file=sys.stderr)
     base = os.path.splitext(os.path.basename(args.cio))[0]
     out_dir = args.out or os.path.dirname(os.path.abspath(args.cio))
     os.makedirs(out_dir, exist_ok=True)
