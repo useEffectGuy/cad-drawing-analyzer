@@ -29,6 +29,22 @@ try:
 except ImportError as e:
     print(f"[ERROR] 缺少依赖: {e}，请执行: pip install ezdxf networkx", file=sys.stderr)
     sys.exit(1)
+
+def _ensure_dxf_input(path: str) -> str:
+    """若输入是 DWG，自动转换为 DXF（需要系统安装 ODA/LibreDWG）。"""
+    if not path.lower().endswith(".dwg"):
+        return path
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from cad_convert import ensure_dxf
+        print("[INFO] 检测到 DWG 文件，正在自动转换为 DXF...")
+        dxf = ensure_dxf(path)
+        print(f"[INFO] 转换完成: {dxf}")
+        return dxf
+    except Exception as e:
+        print(f"[ERROR] {e}", file=sys.stderr)
+        sys.exit(2)
+
 # ---------------------------------------------------------------- 常量
 # 墙线图层关键词（用于封闭区域检测）
 WALL_KEYWORDS = ["墙", "WALL", "Q-", "剪力墙", "隔墙"]
@@ -237,6 +253,7 @@ class SpaceDetector:
                 "space_id": f"SPACE-{i+1:03d}",
                 "polygon": [[_round(p[0]), _round(p[1])] for p in pts],
                 "area": _round(area, 2),
+                "area_m2": _round(area / 1e6, 3) if area > 1e5 else _round(area, 3),
                 "bbox": [_round(min(xs)), _round(min(ys)), _round(max(xs)), _round(max(ys))],
                 "vertex_count": len(pts),
             })
@@ -266,9 +283,18 @@ class SpaceDetector:
                 content = (_dxf_attr(e, "text", "") if t == "TEXT"
                            else (e.plain_text() if hasattr(e, "plain_text") else ""))
                 content = content.strip()
-                # 排除纯数字/标高/尺寸
-                if content and not ELEVATION_PATTERN.search(content) and not content.replace(".", "").isdigit():
-                    candidates.append(content)
+                # 排除纯数字/标高/尺寸/图名类文字（图名常含"平面图""立面图"等）
+                if not content:
+                    continue
+                if ELEVATION_PATTERN.search(content):
+                    continue
+                if content.replace(".", "").isdigit():
+                    continue
+                if re.search(r"(平面图|立面图|剖面图|详图|系统图|大样图|总平面|图$)", content):
+                    continue
+                if re.search(r"1\s*[:：]\s*\d+", content):
+                    continue
+                candidates.append(content)
         return candidates[0][:30] if candidates else ""
     def assign_components(self, spaces: list) -> dict:
         """判断构件归属哪个空间。"""
@@ -460,6 +486,8 @@ def main():
     ap.add_argument("--snap", type=float, default=50.0, help="端点吸附容差")
     ap.add_argument("--json", action="store_true", help="输出 JSON")
     args = ap.parse_args()
+    # DWG 自动转换
+    args.dxf = _ensure_dxf_input(args.dxf)
     os.makedirs(args.out, exist_ok=True)
     base = os.path.splitext(os.path.basename(args.dxf))[0]
     try:

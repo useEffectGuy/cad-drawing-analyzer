@@ -217,12 +217,26 @@ OPERATORS = {
 }
 # ---------------------------------------------------------------- 规则引擎
 class RuleEngine:
-    def __init__(self, rules_path: str):
+    def __init__(self, rules_path: str, enable_cross_discipline: bool = False):
+        """初始化规则引擎。
+        enable_cross_discipline: 是否启用跨专业规则（默认关闭，避免误报）。
+            跨专业规则（category=cross_discipline）涉及专业间碰撞与一致性校验，
+            需要项目上下文才能准确判断，因此默认关闭，由用户按需启用。
+        """
         with open(rules_path, encoding="utf-8") as f:
             cfg = yaml.safe_load(f)
         self.version = cfg.get("version", "unknown")
-        self.rules = [r for r in cfg.get("rules", []) if r.get("enabled", True)]
+        self.enable_cross_discipline = enable_cross_discipline
         self.all_rules = cfg.get("rules", [])
+        self.rules = []
+        for r in self.all_rules:
+            is_cross = r.get("category") == "cross_discipline"
+            # 跨专业规则：需显式启用；其他规则：看 enabled 字段
+            if is_cross:
+                if enable_cross_discipline:
+                    self.rules.append(r)
+            elif r.get("enabled", True):
+                self.rules.append(r)
     def run(self, cio: dict) -> dict:
         results = []
         entity_errors = defaultdict(list)
@@ -341,6 +355,8 @@ def main():
     ap.add_argument("--rules", default=None, help="规则库 YAML 路径")
     ap.add_argument("--out", default=None, help="输出目录")
     ap.add_argument("--json", action="store_true", help="输出 JSON 结果")
+    ap.add_argument("--enable-cross-discipline", action="store_true",
+                    help="启用跨专业规则（碰撞检测、专业一致性校验，默认关闭）")
     args = ap.parse_args()
     # 默认规则库
     rules_path = args.rules
@@ -352,7 +368,7 @@ def main():
         sys.exit(2)
     with open(args.cio, encoding="utf-8") as f:
         cio = json.load(f)
-    engine = RuleEngine(rules_path)
+    engine = RuleEngine(rules_path, enable_cross_discipline=args.enable_cross_discipline)
     result = engine.run(cio)
     base = os.path.splitext(os.path.basename(args.cio))[0]
     out_dir = args.out or os.path.dirname(os.path.abspath(args.cio))
@@ -368,6 +384,7 @@ def main():
     s = result["summary"]
     print("\n===== 审图摘要 =====")
     print(f"规则库版本: {engine.version}")
+    print(f"跨专业规则: {'已启用' if args.enable_cross_discipline else '未启用（加 --enable-cross-discipline 开启）'}")
     print(f"执行规则  : {s['rules_executed']}")
     print(f"通过      : {s['rules_passed']}")
     print(f"错误      : {s['total_errors']}")

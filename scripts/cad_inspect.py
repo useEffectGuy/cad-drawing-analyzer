@@ -30,6 +30,22 @@ try:
 except ImportError:
     print("[ERROR] 缺少依赖 ezdxf，请先执行: pip install ezdxf", file=sys.stderr)
     sys.exit(1)
+
+def _ensure_dxf_input(path: str) -> str:
+    """若输入是 DWG，自动转换为 DXF（需要系统安装 ODA/LibreDWG）。"""
+    if not path.lower().endswith(".dwg"):
+        return path
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from cad_convert import ensure_dxf
+        print("[INFO] 检测到 DWG 文件，正在自动转换为 DXF...")
+        dxf = ensure_dxf(path)
+        print(f"[INFO] 转换完成: {dxf}")
+        return dxf
+    except Exception as e:
+        print(f"[ERROR] {e}", file=sys.stderr)
+        sys.exit(2)
+
 # ---------------------------------------------------------------- 常量
 # 系统块前缀（*Model_Space、*Paper_Space 等）与标注箭头块（_ARCHTICK 等）
 SYSTEM_BLOCK_PREFIXES = ("*", "_")
@@ -537,6 +553,8 @@ def main():
     ap.add_argument("--out", default=".", help="报告输出目录")
     ap.add_argument("--json", action="store_true", help="同时输出 JSON")
     args = ap.parse_args()
+    # DWG 自动转换
+    args.dxf = _ensure_dxf_input(args.dxf)
     os.makedirs(args.out, exist_ok=True)
     base = os.path.splitext(os.path.basename(args.dxf))[0]
     try:
