@@ -8,25 +8,32 @@ DXF 图纸
    ↓ ② 解析层    矢量解析 + 专业识别 + 图例解析 + CIO 契约
    ↓ ③ 识别层    部位识别 + 工序识别 + 材料识别
    ↓ ④ 语义层    规则引擎 + 知识图谱
-   ↓ ⑤ 应用层    工程量清单 / 审图报告 / 材料清单 / 问答
+   ↓ ⑤ 应用层    工程量清单 / 审图报告 / 材料清单 / 问答 / Word·PDF·Excel 一键报告
 ```
-## 十大能力
+## 核心能力
 ### 基础能力
 | 模块 | 能力 |
 |---|---|
 | `cad_inspect.py` | 图纸概览、图层清单、实体统计、图块统计、文字提取、标注统计、规范检查 |
 | `cad_analyze.py` | 专业识别、图例解析、跨图层关联、工程量汇总（含 Excel） |
 | `cad_cio.py` | CIO 标准数据契约转换 + Schema 校验 |
-| `cad_rules.py` | YAML 规则引擎审图（16 个算子） |
+| `cad_rules.py` | YAML 规则引擎审图（19 个算子，13 条基础规则 + 2 条跨专业规则） |
 | `cad_graph.py` | 知识图谱构建 + 多跳推理问答 |
 | `cad_render.py` | 图纸渲染预览 |
 | `cad_convert.py` | DWG 自动转换（探测 ODA/LibreDWG 并自动调用） |
-### 识别引擎（本次新增）
+### 识别引擎
 | 模块 | 能力 |
 |---|---|
 | `cad_space.py` | 📋 图框检测（图幅规格+比例+图签）、🏠 封闭区域识别（房间）、🔗 构件空间归属、📐 标高识别 |
 | `cad_process.py` | 🔨 工序识别（构件→工序映射 + 施工顺序推理） |
 | `cad_material.py` | 🧱 材料识别（8 大类材料提取 + Excel 清单） |
+### 文档交付
+| 模块 | 能力 |
+|---|---|
+| `doc_report.py` | 一键流水线：解析→CIO→空间→工序→材料→审图，产出 Word + PDF + Excel 全套报告 |
+| `doc_word.py` | Word 文档工具箱（创建/读取/编辑/转 PDF，符合 GB/T 44720-2024 排版） |
+| `doc_table.py` | Excel 表格工具箱（增删改查、CSV 互转、多工作表） |
+| `doc_convert.py` | Excel ↔ Word ↔ Markdown ↔ CSV ↔ JSON 格式互转 |
 ## 怎么用
 ### 方式一：直接对话（推荐）
 - "帮我分析这张 CAD 图纸"
@@ -60,6 +67,8 @@ python scripts/cad_graph.py build cio.json --out 图谱.json
 python scripts/cad_graph.py query 图谱.json --ask "灯具有哪些"
 # 渲染预览
 python scripts/cad_render.py 图纸.dxf --out 预览.png
+# 一键生成正式报告（Word + PDF + Excel 全套交付物，推荐）
+python scripts/doc_report.py 图纸.dxf --out 输出目录 --format both --pdf
 ```
 ## 支持的格式
 | 格式 | 支持 |
@@ -68,11 +77,15 @@ python scripts/cad_render.py 图纸.dxf --out 预览.png
 | `.dwg` | ✅ 自动探测 ODA/LibreDWG 并转换；未装工具时给出安装指引 |
 | `.pdf` / 图片 | ❌ 需用视觉识别能力 |
 ## 依赖
-`ezdxf`、`matplotlib`、`openpyxl`、`pyyaml`、`networkx`、`jsonschema`
+`ezdxf`、`networkx`、`openpyxl`、`python-docx`、`reportlab`、`PyYAML`、`matplotlib`、`jsonschema`
+
+一键安装：`pip install -r requirements.txt`
 ## 目录结构
 ```
 cad-drawing-analyzer/
-├── SKILL.md                      # 技能主文件
+├── SKILL.md                      # 技能主文件（11 步工作流）
+├── README.md
+├── requirements.txt              # Python 依赖
 ├── scripts/
 │   ├── cad_inspect.py            # 基础解析与统计
 │   ├── cad_analyze.py            # 智能分析
@@ -80,16 +93,20 @@ cad-drawing-analyzer/
 │   ├── cad_space.py              # 部位/空间识别 + 图框检测
 │   ├── cad_process.py            # 工序识别
 │   ├── cad_material.py           # 材料识别
-│   ├── cad_rules.py              # 规则引擎
+│   ├── cad_rules.py              # 规则引擎（19 个算子）
 │   ├── cad_graph.py              # 知识图谱
 │   ├── cad_render.py             # 图纸渲染
-│   └── cad_convert.py            # DWG 自动转换
+│   ├── cad_convert.py            # DWG 自动转换
+│   ├── doc_report.py             # 一键报告流水线（Word+PDF+Excel）
+│   ├── doc_word.py               # Word 文档工具箱
+│   ├── doc_table.py              # Excel 表格工具箱
+│   └── doc_convert.py            # 文档格式互转
 ├── schemas/
 │   └── cio_schema.json           # CIO 数据契约 Schema
 ├── rules/
-│   ├── default_rules.yaml        # 审图规则库（13 条）
-│   ├── process_rules.yaml        # 工序规则库（20 条）
-│   └── material_dict.yaml        # 材料词典（16 类模式）
+│   ├── default_rules.yaml        # 审图规则库（13 基础 + 2 跨专业 = 15 条）
+│   ├── process_rules.yaml        # 工序规则库（19 条）
+│   └── material_dict.yaml        # 材料词典（21 条模式）
 └── references/
     ├── dxf_entities.md           # DXF 实体属性速查表
     └── analysis_dimensions.md    # 分析维度与专业判断要点

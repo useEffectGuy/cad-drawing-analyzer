@@ -1,0 +1,11 @@
+# cad-drawing-analyzer 运行依赖
+# 安装：pip install -r requirements.txt
+# 行尾注释为已验证可运行版本；未锁定下限，pip 将自动获取兼容版本
+ezdxf>=1.4        # DXF 解析（核心依赖）  verified 1.4.4
+networkx>=3.0     # 封闭区域最小环/拓扑图   verified 3.6.1
+openpyxl>=3.1     # Excel 清单生成        verified 3.1.5
+python-docx>=1.1  # Word 报告生成         verified 1.2.0
+reportlab>=4.0    # PDF 生成             verified 5.0.0
+PyYAML>=6.0       # 规则库/材料词典读取     verified 6.0.3
+matplotlib>=3.7   # 图纸渲染预览（中文字体） verified 3.11.1
+jsonschema>=4.0   # CIO JSON Schema 校验  verified 4.26.0

@@ -96,7 +96,7 @@ python scripts/cad_rules.py <cio.json> --rules rules/default_rules.yaml --out <�
 # 启用跨专业规则（碰撞检测、专业一致性校验，共 15 条）
 python scripts/cad_rules.py <cio.json> --out <输出目录> --enable-cross-discipline
 ```
-**规则与代码分离**——工程师编辑 YAML 即可增删规则。内置 16 个算子，覆盖几何/图层/文字/图块/跨专业五类校验。
+**规则与代码分离**——工程师编辑 YAML 即可增删规则。内置 19 个算子，覆盖几何/图层/文字/图块/跨专业五类校验。
 **跨专业规则默认关闭**：跨专业规则（`category: cross_discipline`）涉及专业间碰撞与一致性校验，需要项目上下文才能准确判断，默认关闭以避免误报。需要时加 `--enable-cross-discipline` 一键启用，无需手动改 YAML。
 ### 第 8 步：知识图谱问答
 ```bash
