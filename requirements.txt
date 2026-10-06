@@ -9,3 +9,6 @@ reportlab>=4.0    # PDF 生成             verified 5.0.0
 PyYAML>=6.0       # 规则库/材料词典读取     verified 6.0.3
 matplotlib>=3.7   # 图纸渲染预览（中文字体） verified 3.11.1
 jsonschema>=4.0   # CIO JSON Schema 校验  verified 4.26.0
+# ---- PDF 主通道依赖（新增） ----
+pdfplumber>=0.11  # PDF 文字/表格提取（矢量通道） verified 0.11.4
+pypdfium2>=4.0    # PDF 渲染为 PNG（扫描通道）   verified 4.30.0
