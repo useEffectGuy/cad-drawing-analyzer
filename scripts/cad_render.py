@@ -67,21 +67,25 @@ def render(dxf_path: str, out_path: str, dpi: int = 150, layers: list | None = N
     plt.close(fig)
     return out_path, font
 def main():
+    from cad_common import Out, add_output_args  # noqa: E402
     ap = argparse.ArgumentParser(description="DXF 图纸渲染预览")
     ap.add_argument("dxf", help="DXF 图纸路径")
     ap.add_argument("--out", default=None, help="输出 PNG 路径")
     ap.add_argument("--dpi", type=int, default=150, help="分辨率 DPI")
     ap.add_argument("--layer", action="append", default=None,
                     help="仅渲染指定图层（可多次指定）")
+    add_output_args(ap)
     args = ap.parse_args()
+    out = Out.from_args(args)
     # DWG 自动转换
     args.dxf = _ensure_dxf_input(args.dxf)
     base = os.path.splitext(os.path.basename(args.dxf))[0]
-    out = args.out or f"{base}_预览.png"
+    o = args.out or f"{base}_预览.png"
     try:
-        path, font = render(args.dxf, out, args.dpi, args.layer)
-        print(f"[OK] 预览图: {os.path.abspath(path)}")
-        print(f"[INFO] 中文字体: {font or '未找到，中文可能显示为方块'}")
+        path, font = render(args.dxf, o, args.dpi, args.layer)
+        out.ok("预览图", os.path.abspath(path))
+        if out.verbose:
+            out.detail(f"[INFO] 中文字体: {font or '未找到，中文可能显示为方块'}")
     except Exception as e:
         print(f"[ERROR] 渲染失败: {e}", file=sys.stderr)
         sys.exit(2)

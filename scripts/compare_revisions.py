@@ -98,19 +98,27 @@ def compare(old_path: str, new_path: str) -> dict:
 
 # ---------------------------------------------------------------- 入口
 def main():
+    from cad_common import Out, add_output_args  # noqa: E402
     ap = argparse.ArgumentParser(description="图纸版本差异比对（预留功能）")
     ap.add_argument("old", help="原版图纸路径")
     ap.add_argument("new", help="新版图纸路径")
     ap.add_argument("--out", required=True, help="输出 diff.json 路径")
+    add_output_args(ap)
     args = ap.parse_args()
+    out = Out.from_args(args)
 
     diff = compare(args.old, args.new)
     os.makedirs(os.path.dirname(os.path.abspath(args.out)) or ".", exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(diff, f, ensure_ascii=False, indent=2)
-    print(f"[OK] 差异比对完成: {args.out}")
-    print(f"     图层新增: {len(diff['layers']['added'])}，删除: {len(diff['layers']['removed'])}")
-    print(f"     图块新增: {len(diff['blocks']['added'])}，删除: {len(diff['blocks']['removed'])}")
+    out.ok("差异比对", args.out,
+           f"图层 {len(diff['layers']['added'])}/{len(diff['layers']['removed'])}",
+           f"图块 {len(diff['blocks']['added'])}/{len(diff['blocks']['removed'])}")
+    if out.verbose:
+        out.detail(
+            f"图层新增: {len(diff['layers']['added'])}，删除: {len(diff['layers']['removed'])}",
+            f"图块新增: {len(diff['blocks']['added'])}，删除: {len(diff['blocks']['removed'])}",
+        )
 
 if __name__ == "__main__":
     main()

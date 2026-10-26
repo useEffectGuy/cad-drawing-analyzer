@@ -258,22 +258,23 @@ def write_process_md(result: dict, cio: dict, out_path: str):
         f.write("\n".join(L))
 # ---------------------------------------------------------------- 入口
 def main():
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from cad_common import Out, add_output_args, rules_path as _rp  # noqa: E402
     ap = argparse.ArgumentParser(description="CAD 图纸工序识别")
     ap.add_argument("cio", help="CIO JSON 文件路径")
     ap.add_argument("--rules", default=None, help="工序规则库 YAML 路径")
     ap.add_argument("--out", default=None, help="输出目录")
     ap.add_argument("--json", action="store_true", help="输出 JSON")
+    add_output_args(ap)
     args = ap.parse_args()
-    rules_path = args.rules
-    if not rules_path:
-        rules_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                                  "rules", "process_rules.yaml")
-    if not os.path.isfile(rules_path):
-        print(f"[ERROR] 规则库不存在: {rules_path}", file=sys.stderr)
+    out = Out.from_args(args)
+    rp = args.rules or _rp("process_rules.yaml")
+    if not os.path.isfile(rp):
+        print(f"[ERROR] 规则库不存在: {rp}", file=sys.stderr)
         sys.exit(2)
     with open(args.cio, encoding="utf-8") as f:
         cio = json.load(f)
-    engine = ProcessEngine(rules_path)
+    engine = ProcessEngine(rp)
     result = engine.run(cio)
     # 一致性校验：YAML 工序是否全部在顺序表中登记
     src_self = open(os.path.abspath(__file__), encoding="utf-8").read()
@@ -284,26 +285,29 @@ def main():
         yaml_procs.update(rule.get("processes", []))
     missing = yaml_procs - reg
     if missing:
-        print(f"[WARN] 以下 {len(missing)} 个工序未在 SEQUENCE_ORDER 登记（按默认顺序处理）:", file=sys.stderr)
-        print("       " + "、".join(sorted(missing)), file=sys.stderr)
+        print(f"[WARN] 以下 {len(missing)} 个工序未在 SEQUENCE_ORDER 登记（按默认顺序处理）: {'、'.join(sorted(missing))}",
+              file=sys.stderr)
     base = os.path.splitext(os.path.basename(args.cio))[0]
     out_dir = args.out or os.path.dirname(os.path.abspath(args.cio))
     os.makedirs(out_dir, exist_ok=True)
     md_path = os.path.join(out_dir, f"{base}_工序识别报告.md")
     write_process_md(result, cio, md_path)
-    print(f"[OK] 工序识别报告: {md_path}")
+    out.ok("工序识别报告", md_path)
     if args.json:
         json_path = os.path.join(out_dir, f"{base}_工序识别数据.json")
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump(result, f, ensure_ascii=False, indent=2)
-        print(f"[OK] JSON 数据: {json_path}")
-    print("\n===== 工序识别摘要 =====")
-    print(f"构件总数  : {result['total_entities']}")
-    print(f"匹配构件  : {result['matched_entities']}")
-    print(f"工序种类  : {result['process_count']}")
-    if result["processes"]:
-        print("主要工序  :")
-        for p in result["processes"][:8]:
-            print(f"   - {p['process']}（{p['occurrence']} 个构件）")
+        out.ok("工序识别数据", json_path)
+    if out.verbose:
+        out.detail(
+            "===== 工序识别摘要 =====",
+            f"构件总数  : {result['total_entities']}",
+            f"匹配构件  : {result['matched_entities']}",
+            f"工序种类  : {result['process_count']}",
+        )
+        if result["processes"]:
+            print("主要工序  :")
+            for p in result["processes"][:8]:
+                print(f"   - {p['process']}（{p['occurrence']} 个构件）")
 if __name__ == "__main__":
     main()

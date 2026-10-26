@@ -214,6 +214,7 @@ def build_excel_report(pipeline: dict, out_path: str) -> str:
     return out_path
 # ---------------------------------------------------------------- 入口
 def main():
+    from cad_common import Out, add_output_args  # noqa: E402
     ap = argparse.ArgumentParser(description="CAD 报告生成器")
     ap.add_argument("dxf", help="DXF 图纸路径")
     ap.add_argument("--out", default=".", help="输出目录")
@@ -221,21 +222,23 @@ def main():
                     help="输出格式")
     ap.add_argument("--pdf", action="store_true", help="同时导出 PDF（仅 docx 格式）")
     ap.add_argument("--work", default=None, help="中间文件目录（默认输出目录下的 _work）")
+    add_output_args(ap)
     args = ap.parse_args()
+    out = Out.from_args(args)
     os.makedirs(args.out, exist_ok=True)
     work = args.work or os.path.join(args.out, "_work")
     base = os.path.splitext(os.path.basename(args.dxf))[0]
-    print("[INFO] 正在跑分析流水线...")
+    out.detail("[INFO] 正在跑分析流水线...")
     pipeline = run_deep(args.dxf, work)
-    print("\n===== 流水线执行情况 =====")
+    out.detail("\n===== 流水线执行情况 =====")
     for step, ok in pipeline["steps"].items():
-        print(f"  {'✅' if ok else '❌'} {step}")
+        out.detail(f"  {'✅' if ok else '❌'} {step}")
     outputs = []
     if args.format in ("docx", "both"):
         docx_path = os.path.join(args.out, f"{base}_分析报告.docx")
         build_word_report(pipeline, docx_path)
         outputs.append(docx_path)
-        print(f"\n[OK] Word 报告: {docx_path}")
+        out.ok("Word 报告", docx_path)
         if args.pdf:
             try:
                 sys.path.insert(0, SCRIPT_DIR)
@@ -243,14 +246,14 @@ def main():
                 pdf_path = os.path.join(args.out, f"{base}_分析报告.pdf")
                 doc_to_pdf(docx_path, pdf_path)
                 outputs.append(pdf_path)
-                print(f"[OK] PDF 报告: {pdf_path}")
+                out.ok("PDF 报告", pdf_path)
             except Exception as e:
                 print(f"[WARN] PDF 导出失败: {e}", file=sys.stderr)
     if args.format in ("xlsx", "both"):
         xlsx_path = os.path.join(args.out, f"{base}_分析清单.xlsx")
         build_excel_report(pipeline, xlsx_path)
         outputs.append(xlsx_path)
-        print(f"[OK] Excel 清单: {xlsx_path}")
-    print(f"\n共生成 {len(outputs)} 个交付文件")
+        out.ok("Excel 清单", xlsx_path)
+    out.detail(f"\n共生成 {len(outputs)} 个交付文件")
 if __name__ == "__main__":
     main()

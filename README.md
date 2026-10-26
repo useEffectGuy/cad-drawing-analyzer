@@ -111,7 +111,59 @@ python scripts/doc_report.py 图纸.dxf --out 输出目录 --format both --pdf
 `ezdxf`、`networkx`、`openpyxl`、`python-docx`、`reportlab`、`PyYAML`、`matplotlib`、`jsonschema`、`pdfplumber`、`pypdfium2`
 
 一键安装：`pip install -r requirements.txt`
-
+## 目录结构
+```
+cad-drawing-analyzer/
+├── SKILL.md                      # 技能主文件（主链路 + 深链路由）
+├── README.md
+├── requirements.txt              # Python 依赖
+├── scripts/
+│   ├── run_pipeline.py           # 唯一编排入口（standard / deep / all）
+│   ├── cad_common.py             # 公共基础设施（DXF/YAML/Excel）
+│   ├── inspect_dxf.py            # 输入清点
+│   ├── extract_catalog.py        # 图纸目录提取
+│   ├── classify_discipline.py    # 专业分类
+│   ├── measure_dxf.py            # DXF 算量
+│   ├── parse_tables.py           # PDF 表格提取
+│   ├── measure_pdf.py            # PDF 矢量几何量算
+│   ├── map_wbs.py                # GB 50300 分部分项映射
+│   ├── aggregate.py              # 汇总出 Excel / Markdown
+│   ├── cad_inspect.py            # 基础解析与统计
+│   ├── cad_analyze.py            # 智能分析
+│   ├── cad_cio.py                # CIO 数据契约转换器
+│   ├── cad_space.py              # 部位/空间识别 + 图框检测
+│   ├── cad_process.py            # 工序识别
+│   ├── cad_material.py           # 材料识别
+│   ├── cad_rules.py              # 规则引擎（19 个算子）
+│   ├── cad_graph.py              # 知识图谱
+│   ├── cad_render.py             # 图纸渲染
+│   ├── cad_convert.py            # DWG 自动转换
+│   ├── convert_dwg.py            # 兼容薄封装
+│   ├── render_pdf.py             # PDF 通道判定与切片
+│   ├── detect_titleblock.py      # 图签/图框识别
+│   ├── compare_revisions.py      # 版本对比
+│   ├── doc_report.py             # 一键报告流水线（Word+PDF+Excel）
+│   ├── doc_word.py               # Word 文档工具箱
+│   ├── doc_table.py              # Excel 表格工具箱
+│   └── doc_convert.py            # 文档格式互转
+├── schemas/
+│   └── cio_schema.json           # CIO 数据契约 Schema
+├── rules/
+│   ├── discipline_dict.yaml      # 专业词典唯一来源
+│   ├── gb50300_map.yaml          # WBS 映射唯一来源
+│   ├── default_rules.yaml        # 审图规则（13 基础 + 2 跨专业）
+│   ├── fire_rules.yaml           # 消防专项规则（6 条）
+│   ├── process_rules.yaml        # 工序规则库（19 条）
+│   └── material_dict.yaml        # 材料词典（21 条模式）
+├── references/
+│   ├── formats.md / catalog.md / discipline-codes.md
+│   ├── quantity-rules.md / gb50300-division.md / reporting.md
+│   ├── dxf_entities.md / analysis_dimensions.md
+│   └── disciplines/              # 9 个专业指引（含智能建筑/节能/电梯/消防）
+└── tests/
+    ├── smoke_test.py             # 23 条端到端冒烟断言
+    └── fixtures/                   # DXF 生成器与金标准
+```
 ## 实测效果
 ### 测试一：结构平面图（本次新增能力验证）
 - ✅ **图框检测**：识别出 A3 图幅（1:100），提取图号"结施-03"、图名"三层结构平面图"
@@ -128,4 +180,4 @@ python scripts/doc_report.py 图纸.dxf --out 输出目录 --format both --pdf
 - ✅ 识别 6 樘窗、4 樘门，提取门编号和宽度
 ### 回归验证
 - 13 项端到端测试全部通过 ✅
-- `python tests/smoke_test.py`：8 条冒烟断言全部通过 ✅（清点 / 转换探测 / 目录 / 专业 / 算量 / WBS / Excel / 流水线）
+- `python tests/smoke_test.py -v`：23 条冒烟断言全部通过 ✅（清点 / 转换探测 / 目录 / 专业 / 算量 / WBS / Excel / 流水线 / 修复回归 / 契约自检）

@@ -322,31 +322,40 @@ def graph_stats(G: nx.DiGraph) -> dict:
     }
 # ---------------------------------------------------------------- 入口
 def main():
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from cad_common import Out, add_output_args  # noqa: E402
     ap = argparse.ArgumentParser(description="工程知识图谱构建与查询")
     sub = ap.add_subparsers(dest="cmd", required=True)
     p_build = sub.add_parser("build", help="从 CIO 构建图谱")
     p_build.add_argument("cio", help="CIO JSON 路径")
     p_build.add_argument("--out", default=None, help="图谱输出路径")
+    add_output_args(p_build)
     p_query = sub.add_parser("query", help="查询图谱")
     p_query.add_argument("graph", help="图谱 JSON 路径")
     p_query.add_argument("--ask", required=True, help="自然语言问题")
+    add_output_args(p_query)
     p_stats = sub.add_parser("stats", help="图谱统计")
     p_stats.add_argument("graph", help="图谱 JSON 路径")
+    add_output_args(p_stats)
     args = ap.parse_args()
+    out = Out.from_args(args)
     if args.cmd == "build":
         with open(args.cio, encoding="utf-8") as f:
             cio = json.load(f)
         G = build_graph(cio)
-        out = args.out or os.path.splitext(args.cio)[0] + "_图谱.json"
-        save_graph(G, out)
-        print(f"[OK] 知识图谱: {out}")
+        o = args.out or os.path.splitext(args.cio)[0] + "_图谱.json"
+        save_graph(G, o)
         st = graph_stats(G)
-        print("\n===== 图谱统计 =====")
-        print(f"节点总数  : {st['total_nodes']}")
-        print(f"边总数    : {st['total_edges']}")
-        print(f"节点类型  : {st['node_types']}")
-        print(f"关系类型  : {st['relations']}")
-        print(f"构件分类  : {st['component_categories']}")
+        out.ok("知识图谱", o, f"{st['total_nodes']} 节点 / {st['total_edges']} 边")
+        if out.verbose:
+            out.detail(
+                "===== 图谱统计 =====",
+                f"节点总数  : {st['total_nodes']}",
+                f"边总数    : {st['total_edges']}",
+                f"节点类型  : {st['node_types']}",
+                f"关系类型  : {st['relations']}",
+                f"构件分类  : {st['component_categories']}",
+            )
     elif args.cmd == "query":
         G = load_graph(args.graph)
         q = GraphQuery(G)

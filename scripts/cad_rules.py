@@ -389,6 +389,8 @@ def write_rules_md(engine_result: dict, cio: dict, out_path: str):
         f.write("\n".join(L))
 # ---------------------------------------------------------------- 入口
 def main():
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from cad_common import Out, add_output_args, rules_path  # noqa: E402
     ap = argparse.ArgumentParser(description="CIO 规则引擎校验")
     ap.add_argument("cio", help="CIO JSON 文件路径")
     ap.add_argument("--rules", default=None, help="规则库 YAML 路径")
@@ -396,38 +398,40 @@ def main():
     ap.add_argument("--json", action="store_true", help="输出 JSON 结果")
     ap.add_argument("--enable-cross-discipline", action="store_true",
                     help="启用跨专业规则（碰撞检测、专业一致性校验，默认关闭）")
+    add_output_args(ap)
     args = ap.parse_args()
+    out = Out.from_args(args)
     # 默认规则库
-    rules_path = args.rules
-    if not rules_path:
-        rules_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                                  "rules", "default_rules.yaml")
-    if not os.path.isfile(rules_path):
-        print(f"[ERROR] 规则库不存在: {rules_path}", file=sys.stderr)
+    rp = args.rules or rules_path("default_rules.yaml")
+    if not os.path.isfile(rp):
+        print(f"[ERROR] 规则库不存在: {rp}", file=sys.stderr)
         sys.exit(2)
     with open(args.cio, encoding="utf-8") as f:
         cio = json.load(f)
-    engine = RuleEngine(rules_path, enable_cross_discipline=args.enable_cross_discipline)
+    engine = RuleEngine(rp, enable_cross_discipline=args.enable_cross_discipline)
     result = engine.run(cio)
     base = os.path.splitext(os.path.basename(args.cio))[0]
     out_dir = args.out or os.path.dirname(os.path.abspath(args.cio))
     os.makedirs(out_dir, exist_ok=True)
     md_path = os.path.join(out_dir, f"{base}_审图报告.md")
     write_rules_md(result, cio, md_path)
-    print(f"[OK] 审图报告: {md_path}")
+    out.ok("审图报告", md_path)
     if args.json:
         json_path = os.path.join(out_dir, f"{base}_审图结果.json")
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump(result, f, ensure_ascii=False, indent=2)
-        print(f"[OK] 审图结果: {json_path}")
-    s = result["summary"]
-    print("\n===== 审图摘要 =====")
-    print(f"规则库版本: {engine.version}")
-    print(f"跨专业规则: {'已启用' if args.enable_cross_discipline else '未启用（加 --enable-cross-discipline 开启）'}")
-    print(f"执行规则  : {s['rules_executed']}")
-    print(f"通过      : {s['rules_passed']}")
-    print(f"错误      : {s['total_errors']}")
-    print(f"警告      : {s['total_warnings']}")
-    print(f"提示      : {s['total_infos']}")
+        out.ok("审图结果", json_path)
+    if out.verbose:
+        s = result["summary"]
+        out.detail(
+            "===== 审图摘要 =====",
+            f"规则库版本: {engine.version}",
+            f"跨专业规则: {'已启用' if args.enable_cross_discipline else '未启用（加 --enable-cross-discipline 开启）'}",
+            f"执行规则  : {s['rules_executed']}",
+            f"通过      : {s['rules_passed']}",
+            f"错误      : {s['total_errors']}",
+            f"警告      : {s['total_warnings']}",
+            f"提示      : {s['total_infos']}",
+        )
 if __name__ == "__main__":
     main()

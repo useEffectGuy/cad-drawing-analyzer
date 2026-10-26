@@ -238,6 +238,7 @@ def to_csv(xlsx_path: str, out_path: str, sheet: str = None) -> str:
     return out_path
 # ---------------------------------------------------------------- 入口
 def main():
+    from cad_common import Out, add_output_args  # noqa: E402
     ap = argparse.ArgumentParser(description="表格工具箱（创建/读取/编辑/转换）")
     sub = ap.add_subparsers(dest="cmd", required=True)
     # create
@@ -247,6 +248,7 @@ def main():
     p1.add_argument("--headers", default=None, help="表头，逗号分隔")
     p1.add_argument("--rows", default=None, help="数据行，格式 'a,b,c|d,e,f'")
     p1.add_argument("--sheet", default="Sheet1", help="工作表名")
+    add_output_args(p1)
     # read
     p2 = sub.add_parser("read", help="读取表格")
     p2.add_argument("file", help="xlsx/csv 路径")
@@ -263,25 +265,30 @@ def main():
     p3.add_argument("--headers", default=None, help="新表表头，逗号分隔")
     p3.add_argument("--update-header", default=None, help="更新表头，逗号分隔")
     p3.add_argument("--out", default=None, help="另存为（默认覆盖原文件）")
+    add_output_args(p3)
     # from-csv / to-csv
     p4 = sub.add_parser("from-csv", help="CSV 转 Excel")
     p4.add_argument("csv", help="CSV 路径")
     p4.add_argument("--out", required=True, help="输出 xlsx 路径")
+    add_output_args(p4)
     p5 = sub.add_parser("to-csv", help="Excel 转 CSV")
     p5.add_argument("xlsx", help="xlsx 路径")
     p5.add_argument("--out", required=True, help="输出 CSV 路径")
     p5.add_argument("--sheet", default=None, help="指定工作表")
+    add_output_args(p5)
     args = ap.parse_args()
+    out = Out.from_args(args)
     try:
         if args.cmd == "create":
             headers = [h.strip() for h in args.headers.split(",")] if args.headers else None
             rows = _parse_rows(args.rows) if args.rows else None
-            out = create_table(args.out, args.title, headers, rows, args.sheet)
-            print(f"[OK] 表格已创建: {out}")
-            if headers:
-                print(f"     表头: {headers}")
-            if rows:
-                print(f"     数据行: {len(rows)} 行")
+            o = create_table(args.out, args.title, headers, rows, args.sheet)
+            out.ok("表格已创建", o)
+            if out.verbose:
+                if headers:
+                    out.detail(f"表头: {headers}")
+                if rows:
+                    out.detail(f"数据行: {len(rows)} 行")
         elif args.cmd == "read":
             data = read_table(args.file, args.sheet)
             if args.json:
@@ -295,16 +302,16 @@ def main():
                     if info["row_count"] > 20:
                         print(f"  ... 共 {info['row_count']} 行，仅显示前 20 行")
         elif args.cmd == "edit":
-            out = edit_table(args.file, args.sheet, args.add_row, args.delete_row,
-                             args.update_cell, args.add_sheet, args.headers,
-                             args.update_header, args.out)
-            print(f"[OK] 表格已更新: {out}")
+            o = edit_table(args.file, args.sheet, args.add_row, args.delete_row,
+                           args.update_cell, args.add_sheet, args.headers,
+                           args.update_header, args.out)
+            out.ok("表格已更新", o)
         elif args.cmd == "from-csv":
-            out = from_csv(args.csv, args.out)
-            print(f"[OK] 已转换: {out}")
+            o = from_csv(args.csv, args.out)
+            out.ok("已转换", o)
         elif args.cmd == "to-csv":
-            out = to_csv(args.xlsx, args.out, args.sheet)
-            print(f"[OK] 已转换: {out}")
+            o = to_csv(args.xlsx, args.out, args.sheet)
+            out.ok("已转换", o)
     except Exception as e:
         print(f"[ERROR] {e}", file=sys.stderr)
         sys.exit(2)

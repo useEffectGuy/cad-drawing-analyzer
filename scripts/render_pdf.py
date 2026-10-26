@@ -139,6 +139,8 @@ def _tile_image(img, max_pixel: int) -> list:
 
 # ---------------------------------------------------------------- 入口
 def main():
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from cad_common import Out, add_output_args  # noqa: E402
     ap = argparse.ArgumentParser(description="PDF 渲染与通道判定（工作流步骤②）")
     ap.add_argument("pdf", help="PDF 文件路径")
     ap.add_argument("--out", help="输出目录")
@@ -146,7 +148,9 @@ def main():
     ap.add_argument("--tile", action="store_true", help="大图纸自动分片切片")
     ap.add_argument("--detect-channel", action="store_true", help="仅判定矢量/扫描通道")
     ap.add_argument("--pages", nargs="*", type=int, help="指定页码（从 1 开始）")
+    add_output_args(ap)
     args = ap.parse_args()
+    out = Out.from_args(args)
 
     if args.detect_channel:
         info = detect_channel(args.pdf)
@@ -158,11 +162,12 @@ def main():
     pages = [p - 1 for p in args.pages] if args.pages else None
     try:
         files = render_pdf(args.pdf, args.out, args.dpi, args.tile, pages)
-        print(f"[OK] 渲染完成：{len(files)} 个文件")
-        for f in files[:10]:
-            print(f"     {f}")
-        if len(files) > 10:
-            print(f"     ... 共 {len(files)} 个")
+        out.ok("PDF 渲染完成", args.out, f"{len(files)} 个文件")
+        if out.verbose:
+            for f in files[:10]:
+                print(f"     {f}")
+            if len(files) > 10:
+                print(f"     ... 共 {len(files)} 个")
     except Exception as e:
         print(f"[ERROR] {e}", file=sys.stderr)
         sys.exit(2)

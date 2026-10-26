@@ -148,10 +148,13 @@ def detect_titleblock(dxf_path: str) -> dict:
 
 # ---------------------------------------------------------------- 入口
 def main():
+    from cad_common import Out, add_output_args  # noqa: E402
     ap = argparse.ArgumentParser(description="单张图框识别（工作流步骤③兜底）")
     ap.add_argument("drawing", help="DXF/DWG 图纸路径")
     ap.add_argument("--out", required=True, help="输出 meta.json 路径")
+    add_output_args(ap)
     args = ap.parse_args()
+    out = Out.from_args(args)
 
     try:
         from convert_dwg import ensure_dxf
@@ -164,10 +167,15 @@ def main():
     os.makedirs(os.path.dirname(os.path.abspath(args.out)) or ".", exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(info, f, ensure_ascii=False, indent=2)
-    print(f"[OK] 图框识别完成: {args.out}")
-    print(f"     图号: {info.get('drawing_no') or '未识别'}")
-    print(f"     图名: {info.get('drawing_name') or '未识别'}")
-    print(f"     比例: {info.get('scale') or '未识别'}")
+    out.ok("图框识别", args.out,
+           f"图号={info.get('drawing_no') or '未识别'}",
+           f"比例={info.get('scale') or '未识别'}")
+    if out.verbose:
+        out.detail(
+            f"图号: {info.get('drawing_no') or '未识别'}",
+            f"图名: {info.get('drawing_name') or '未识别'}",
+            f"比例: {info.get('scale') or '未识别'}",
+        )
 
 if __name__ == "__main__":
     main()

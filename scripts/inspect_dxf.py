@@ -28,10 +28,7 @@ except ImportError:
 # 复用 cad_inspect 的完整体检逻辑
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from cad_common import Out, add_output_args  # noqa: E402
-try:
-    from cad_inspect import inspect_dxf as _inspect_dxf_full
-except ImportError:
-    _inspect_dxf_full = None
+from cad_inspect import inspect_dxf as _inspect_dxf_full  # noqa: E402
 
 # ---------------------------------------------------------------- 输入清点
 SUPPORTED_EXTS = (".dxf", ".dwg", ".pdf")

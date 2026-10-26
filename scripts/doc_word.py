@@ -408,6 +408,7 @@ def doc_to_pdf(docx_path: str, pdf_path: str):
     return pdf_path
 # ---------------------------------------------------------------- 入口
 def main():
+    from cad_common import Out, add_output_args  # noqa: E402
     ap = argparse.ArgumentParser(description="Word 文档工具箱")
     sub = ap.add_subparsers(dest="cmd", required=True)
     # create
@@ -419,6 +420,7 @@ def main():
     p1.add_argument("--header", default=None, help="页眉文字")
     p1.add_argument("--author", default=None, help="作者（封面用）")
     p1.add_argument("--cover", action="store_true", help="生成封面")
+    add_output_args(p1)
     # read
     p2 = sub.add_parser("read", help="读取文档")
     p2.add_argument("file", help="docx 路径")
@@ -431,11 +433,14 @@ def main():
     p3.add_argument("--add-heading", default=None, help="追加标题")
     p3.add_argument("--add-table", default=None, help="追加表格，格式 '表头1,表头2|值1,值2'")
     p3.add_argument("--out", default=None, help="另存为（默认覆盖）")
+    add_output_args(p3)
     # to-pdf
     p4 = sub.add_parser("to-pdf", help="导出 PDF")
     p4.add_argument("docx", help="docx 路径")
     p4.add_argument("--out", required=True, help="输出 pdf 路径")
+    add_output_args(p4)
     args = ap.parse_args()
+    out = Out.from_args(args)
     try:
         if args.cmd == "create":
             sections = None
@@ -447,9 +452,9 @@ def main():
                         sections.append((parts[0].strip(), parts[1].replace("\\n", "\n")))
                     elif parts[0].strip():
                         sections.append((parts[0].strip(), ""))
-            out = create_doc(args.out, args.title, sections,
-                             header_text=args.header, author=args.author, cover=args.cover)
-            print(f"[OK] 文档已创建: {out}")
+            o = create_doc(args.out, args.title, sections,
+                           header_text=args.header, author=args.author, cover=args.cover)
+            out.ok("文档已创建", o)
         elif args.cmd == "read":
             data = read_doc(args.file)
             if args.json:
@@ -466,12 +471,12 @@ def main():
                     for row in t["rows"][:10]:
                         print("   ", " | ".join(row))
         elif args.cmd == "edit":
-            out = edit_doc(args.file, args.append, args.replace,
-                           args.add_heading, args.add_table, args.out)
-            print(f"[OK] 文档已更新: {out}")
+            o = edit_doc(args.file, args.append, args.replace,
+                         args.add_heading, args.add_table, args.out)
+            out.ok("文档已更新", o)
         elif args.cmd == "to-pdf":
-            out = doc_to_pdf(args.docx, args.out)
-            print(f"[OK] PDF 已导出: {out}")
+            o = doc_to_pdf(args.docx, args.out)
+            out.ok("PDF 已导出", o)
     except Exception as e:
         print(f"[ERROR] {e}", file=sys.stderr)
         sys.exit(2)

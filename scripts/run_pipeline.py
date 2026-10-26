@@ -103,6 +103,32 @@ def _dump_json(obj, path: str):
         json.dump(obj, f, ensure_ascii=False, indent=2)
 
 
+SUMMARY_MAX_BYTES = 8192
+
+
+def _truncate_summary(summary: dict, max_bytes: int = SUMMARY_MAX_BYTES) -> dict:
+    """保证 summary.json 落盘后不超过 max_bytes。先裁 warnings，再截 stage summary 文本。"""
+    import io as _io
+    def size_of(obj):
+        return len(json.dumps(obj, ensure_ascii=False, indent=2).encode("utf-8"))
+    if size_of(summary) <= max_bytes:
+        return summary
+    # 1) 先裁 warnings
+    summary = dict(summary)
+    if summary.get("warnings"):
+        summary["warnings"] = summary["warnings"][:10]
+    # 2) 再把每个 stage 的 summary 截断到 40 字符
+    for st in summary.get("stages", []):
+        if st.get("summary") and len(st["summary"]) > 40:
+            st["summary"] = st["summary"][:40] + "…"
+    # 3) 把 deliverables/counts 中的长路径裁剪
+    for key in ("deliverables",):
+        d = summary.get(key)
+        if isinstance(d, dict):
+            summary[key] = {k: os.path.basename(v) if isinstance(v, str) else v for k, v in d.items()}
+    return summary
+
+
 def _script(name: str) -> str:
     return os.path.join(SCRIPT_DIR, name)
 
@@ -115,11 +141,13 @@ class Ctx:
     """流水线上下文。"""
 
     def __init__(self, input_path: str, work: str, snap: float = 50.0,
-                 pdf_scale: float = 1.0):
+                 pdf_scale: float = 1.0, dpi: int = 200, tolerance: int = 3000):
         self.input = input_path
         self.work = work
         self.snap = snap
         self.pdf_scale = pdf_scale
+        self.dpi = dpi
+        self.tolerance = tolerance
         self.inv = {}
         self.input_sig = []
 
@@ -574,7 +602,9 @@ def _summary_entry(sid: str, res: dict) -> dict:
 def run_pipeline(input_path: str, work: str, profile: str = "standard",
                  resume: bool = False, force: bool = False,
                  only=None, skip=None, snap: float = 50.0,
-                 pdf_scale: float = 1.0, out: Out = None) -> dict:
+                 pdf_scale: float = 1.0, dpi: int = 200,
+                 tolerance: int = 3000, isolation: bool = False,
+                 out: Out = None) -> dict:
     out = out or Out()
     if not os.path.exists(input_path):
         raise Fatal(f"输入不存在: {input_path}")
@@ -599,7 +629,7 @@ def run_pipeline(input_path: str, work: str, profile: str = "standard",
 
     manifest_path = os.path.join(work, ".pipeline", "manifest.json")
     manifest = _load_json(manifest_path) or {"schema": MANIFEST_SCHEMA, "stages": {}}
-    ctx = Ctx(input_path, work, snap, pdf_scale)
+    ctx = Ctx(input_path, work, snap, pdf_scale, dpi, tolerance)
 
     stage_results = {}
     failed = []
@@ -663,7 +693,7 @@ def run_pipeline(input_path: str, work: str, profile: str = "standard",
         "warnings": warnings,
     }
     summary_path = os.path.join(work, "summary.json")
-    _dump_json(summary, summary_path)
+    _dump_json(_truncate_summary(summary), summary_path)
 
     manifest["generated_at"] = _now_iso()
     _dump_json(manifest, manifest_path)
@@ -764,6 +794,9 @@ def main(argv=None):
     ap.add_argument("--snap", type=float, default=50.0, help="空间识别端点吸附容差")
     ap.add_argument("--pdf-scale", type=float, default=1.0,
                     help="PDF 几何量算比例分母，如 1:100 传 100（默认 1:1）")
+    ap.add_argument("--dpi", type=int, default=200, help="PDF 渲染 DPI（扫描兜底时使用）")
+    ap.add_argument("--tolerance", type=int, default=3000, help="空间识别端点吸附容差（兼容别名）")
+    ap.add_argument("--isolation", action="store_true", help="deep 链用 subprocess 隔离模式（默认函数直调）")
     add_output_args(ap)
     args = ap.parse_args(argv)
     out = Out.from_args(args)
@@ -774,7 +807,9 @@ def main(argv=None):
             resume=args.resume, force=args.force,
             only=args.only.split(",") if args.only else None,
             skip=args.skip.split(",") if args.skip else None,
-            snap=args.snap, pdf_scale=args.pdf_scale, out=out,
+            snap=args.snap, pdf_scale=args.pdf_scale,
+            dpi=args.dpi, tolerance=args.tolerance, isolation=args.isolation,
+            out=out,
         )
     except Fatal as e:
         print(f"[ERROR] {e}", file=sys.stderr)

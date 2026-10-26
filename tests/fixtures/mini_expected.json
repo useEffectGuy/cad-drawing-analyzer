@@ -1,0 +1,18 @@
+{
+  "schema": "tzp.mini.expected/1.0",
+  "description": "mini.dxf fixture 跑全链路后的关键计数基线（供未来回归 diff 用）",
+  "quantities": {
+    "block_total": 2,
+    "block_types": 1
+  },
+  "wbs": {
+    "division_count": 3
+  },
+  "catalog": {
+    "items": 2,
+    "disciplines": [
+      "建筑",
+      "给排水"
+    ]
+  }
+}

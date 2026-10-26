@@ -210,25 +210,33 @@ WRITERS = {
 }
 # ---------------------------------------------------------------- 入口
 def main():
+    from cad_common import Out, add_output_args  # noqa: E402
     ap = argparse.ArgumentParser(description="文档格式互转")
     ap.add_argument("src", help="源文件路径")
     ap.add_argument("--to", required=True, choices=list(WRITERS.keys()), help="目标格式")
     ap.add_argument("--out", default=None, help="输出路径")
+    add_output_args(ap)
     args = ap.parse_args()
+    out = Out.from_args(args)
     try:
         data = read_any(args.src)
         base = os.path.splitext(os.path.basename(args.src))[0]
-        out = args.out or f"{base}.{args.to}"
+        o = args.out or f"{base}.{args.to}"
         # PDF 特殊处理
         if args.to == "pdf":
             from doc_word import doc_to_pdf
-            out = doc_to_pdf(args.src, out)
+            o = doc_to_pdf(args.src, o)
         else:
             writer = WRITERS[args.to]
-            out = writer(data, out)
-        print(f"[OK] 已转换: {args.src} → {out}")
-        print(f"     源类型: {data.get('type')}，段落 {len(data.get('paragraphs', []))} 段，"
-              f"表格 {len(data.get('rows', []))} 行")
+            o = writer(data, o)
+        out.ok("已转换", o,
+               f"{args.src} → {args.to}",
+               f"源 {data.get('type')}，段落 {len(data.get('paragraphs', []))} 段")
+        if out.verbose:
+            out.detail(
+                f"源类型: {data.get('type')}，段落 {len(data.get('paragraphs', []))} 段，"
+                f"表格 {len(data.get('rows', []))} 行",
+            )
     except Exception as e:
         print(f"[ERROR] {e}", file=sys.stderr)
         sys.exit(2)

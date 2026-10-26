@@ -215,17 +215,18 @@ def write_material_md(result: dict, cio: dict, out_path: str):
         f.write("\n".join(L))
 # ---------------------------------------------------------------- 入口
 def main():
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from cad_common import Out, add_output_args, rules_path as _rp  # noqa: E402
     ap = argparse.ArgumentParser(description="CAD 图纸材料识别")
     ap.add_argument("cio", help="CIO JSON 文件路径")
     ap.add_argument("--dict", default=None, help="材料词典 YAML 路径")
     ap.add_argument("--out", default=None, help="输出目录")
     ap.add_argument("--excel", action="store_true", help="导出 Excel 材料清单")
     ap.add_argument("--json", action="store_true", help="输出 JSON")
+    add_output_args(ap)
     args = ap.parse_args()
-    dict_path = args.dict
-    if not dict_path:
-        dict_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                                 "rules", "material_dict.yaml")
+    out = Out.from_args(args)
+    dict_path = args.dict or _rp("material_dict.yaml")
     if not os.path.isfile(dict_path):
         print(f"[ERROR] 材料词典不存在: {dict_path}", file=sys.stderr)
         sys.exit(2)
@@ -237,25 +238,28 @@ def main():
     os.makedirs(out_dir, exist_ok=True)
     md_path = os.path.join(out_dir, f"{base}_材料识别报告.md")
     write_material_md(result, cio, md_path)
-    print(f"[OK] 材料识别报告: {md_path}")
+    out.ok("材料识别报告", md_path)
     if args.json:
         json_path = os.path.join(out_dir, f"{base}_材料识别数据.json")
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump(result, f, ensure_ascii=False, indent=2)
-        print(f"[OK] JSON 数据: {json_path}")
+        out.ok("材料识别数据", json_path)
     if args.excel:
         try:
             xl = os.path.join(out_dir, f"{base}_材料清单.xlsx")
             export_excel(result, xl)
-            print(f"[OK] Excel 清单: {xl}")
+            out.ok("Excel 清单", xl)
         except Exception as e:
             print(f"[WARN] Excel 导出失败: {e}", file=sys.stderr)
-    print("\n===== 材料识别摘要 =====")
-    print(f"命中数    : {result['total_hits']}")
-    print(f"材料类别  : {result['category_count']}")
-    for cat, info in sorted(result["by_category"].items(), key=lambda x: -x[1]["count"]):
-        print(f"   - {cat}: {info['count']} 处")
-        for s in info["specs"][:3]:
-            print(f"       · {s['spec']} × {s['count']}")
+    if out.verbose:
+        out.detail(
+            "===== 材料识别摘要 =====",
+            f"命中数    : {result['total_hits']}",
+            f"材料类别  : {result['category_count']}",
+        )
+        for cat, info in sorted(result["by_category"].items(), key=lambda x: -x[1]["count"]):
+            print(f"   - {cat}: {info['count']} 处")
+            for s in info["specs"][:3]:
+                print(f"       · {s['spec']} × {s['count']}")
 if __name__ == "__main__":
     main()
