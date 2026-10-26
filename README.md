@@ -4,6 +4,13 @@
 
 ## 一句话介绍
 把 CAD 图纸（DXF）变成**标准化、可推理**的工程数据，自动提取**专业归属、部位/空间、工序类型、材料信息**四大工程语义要素。
+## 本次更新（2026.10.26-v2 重构）
+- **唯一编排入口** `run_pipeline.py`：`standard`（清点→目录→专业→算量/表格→WBS→汇总）与 `deep`（CIO→空间→工序→材料→审图）两条链，支持 `--resume` / `--force` / `--only` / `--skip`，产出 `summary.json` 作为 LLM 唯一读取入口。
+- **公共基础设施** `cad_common.py`：DXF 工具函数、YAML 加载、Excel 样式收敛到一处，删除 20+ 脚本中的重复实现。
+- **规则数据外置**：新增 `rules/discipline_dict.yaml`（专业词典唯一来源）与 `rules/gb50300_map.yaml`（WBS 映射唯一来源），代码只查表，不再与文档双源漂移。
+- **PDF 矢量几何量算**：新增 `measure_pdf.py`，统计线条长度、矩形面积与图元数量，产物 `pdf_quantities.json`；`parse_tables.py --geometry` 可一并产出，且 `tables.json` 既有结构不变。
+- **专业覆盖补齐**：新增智能建筑、建筑节能、电梯、消防 4 篇专业指引，以及消防专项规则库 `rules/fire_rules.yaml`（6 条规则）。
+- **冒烟测试**：新增 `tests/smoke_test.py`（8 条端到端断言）与测试用 DXF 生成器，`python tests/smoke_test.py` 即可运行，无需 pytest。
 ## 系统架构
 ```
 DXF 图纸
@@ -14,13 +21,29 @@ DXF 图纸
    ↓ ⑤ 应用层    工程量清单 / 审图报告 / 材料清单 / 问答 / Word·PDF·Excel 一键报告
 ```
 ## 核心能力
+### 编排与基础设施
+| 模块 | 能力 |
+|---|---|
+| `run_pipeline.py` | 唯一编排入口：`standard` / `deep` / `all` 三种 profile，断点续跑，输出 `summary.json` |
+| `cad_common.py` | 公共基础设施：DXF 属性读取、YAML 加载、专业词典查询、Excel 样式 |
+### 解析与算量
+| 模块 | 能力 |
+|---|---|
+| `inspect_dxf.py` | 输入清点（文件数、格式、图层、图框概览） |
+| `extract_catalog.py` | 图纸目录表结构化提取 |
+| `classify_discipline.py` | 按图号/图名/图层关键词判定专业 |
+| `measure_dxf.py` | DXF 几何算量（线长、面积、图块计数） |
+| `parse_tables.py` | PDF 表格提取（可选 `--geometry` 同步几何量算） |
+| `measure_pdf.py` | 矢量 PDF 长度/面积/计数，输出 `pdf_quantities.json` |
+| `map_wbs.py` | GB 50300 分部分项划分，映射表来自 `rules/gb50300_map.yaml` |
+| `aggregate.py` | 汇总出 Excel（分专业 sheet + 总表）与分析报告 |
 ### 基础能力
 | 模块 | 能力 |
 |---|---|
 | `cad_inspect.py` | 图纸概览、图层清单、实体统计、图块统计、文字提取、标注统计、规范检查 |
 | `cad_analyze.py` | 专业识别、图例解析、跨图层关联、工程量汇总（含 Excel） |
 | `cad_cio.py` | CIO 标准数据契约转换 + Schema 校验 |
-| `cad_rules.py` | YAML 规则引擎审图（19 个算子，13 条基础规则 + 2 条跨专业规则） |
+| `cad_rules.py` | YAML 规则引擎审图（19 个算子，13 条基础 + 2 条跨专业；另有消防专项 6 条） |
 | `cad_graph.py` | 知识图谱构建 + 多跳推理问答 |
 | `cad_render.py` | 图纸渲染预览 |
 | `cad_convert.py` | DWG 自动转换（探测 ODA/LibreDWG 并自动调用） |
@@ -47,6 +70,10 @@ DXF 图纸
 - "跟配电箱相连的插座有哪些？"
 ### 方式二：命令行
 ```bash
+# 一键流水线（推荐；只读 work/summary.json）
+python scripts/run_pipeline.py 图纸目录 --work work
+python scripts/run_pipeline.py 图纸目录 --work work --profile deep   # 语义深链
+python scripts/run_pipeline.py 图纸目录 --work work --resume         # 断点续跑
 # DWG 自动转换（探测工具）
 python scripts/cad_convert.py 图纸.dwg --detect
 python scripts/cad_convert.py 图纸.dwg --out 输出.dxf
@@ -78,42 +105,13 @@ python scripts/doc_report.py 图纸.dxf --out 输出目录 --format both --pdf
 |---|---|
 | `.dxf` | ✅ 直接解析（R12 ~ R2018） |
 | `.dwg` | ✅ 自动探测 ODA/LibreDWG 并转换；未装工具时给出安装指引 |
-| `.pdf` / 图片 | ❌ 需用视觉识别能力 |
+| `.pdf` | ✅ 矢量页直解文字/表格/线条，另做长度面积计数；扫描页渲染切片后用视觉模型读取 |
+| 图片 | ✅ 渲染切片 + 视觉识别 |
 ## 依赖
-`ezdxf`、`networkx`、`openpyxl`、`python-docx`、`reportlab`、`PyYAML`、`matplotlib`、`jsonschema`
+`ezdxf`、`networkx`、`openpyxl`、`python-docx`、`reportlab`、`PyYAML`、`matplotlib`、`jsonschema`、`pdfplumber`、`pypdfium2`
 
 一键安装：`pip install -r requirements.txt`
-## 目录结构
-```
-cad-drawing-analyzer/
-├── SKILL.md                      # 技能主文件（11 步工作流）
-├── README.md
-├── requirements.txt              # Python 依赖
-├── scripts/
-│   ├── cad_inspect.py            # 基础解析与统计
-│   ├── cad_analyze.py            # 智能分析
-│   ├── cad_cio.py                # CIO 数据契约转换器
-│   ├── cad_space.py              # 部位/空间识别 + 图框检测
-│   ├── cad_process.py            # 工序识别
-│   ├── cad_material.py           # 材料识别
-│   ├── cad_rules.py              # 规则引擎（19 个算子）
-│   ├── cad_graph.py              # 知识图谱
-│   ├── cad_render.py             # 图纸渲染
-│   ├── cad_convert.py            # DWG 自动转换
-│   ├── doc_report.py             # 一键报告流水线（Word+PDF+Excel）
-│   ├── doc_word.py               # Word 文档工具箱
-│   ├── doc_table.py              # Excel 表格工具箱
-│   └── doc_convert.py            # 文档格式互转
-├── schemas/
-│   └── cio_schema.json           # CIO 数据契约 Schema
-├── rules/
-│   ├── default_rules.yaml        # 审图规则库（13 基础 + 2 跨专业 = 15 条）
-│   ├── process_rules.yaml        # 工序规则库（19 条）
-│   └── material_dict.yaml        # 材料词典（21 条模式）
-└── references/
-    ├── dxf_entities.md           # DXF 实体属性速查表
-    └── analysis_dimensions.md    # 分析维度与专业判断要点
-```
+
 ## 实测效果
 ### 测试一：结构平面图（本次新增能力验证）
 - ✅ **图框检测**：识别出 A3 图幅（1:100），提取图号"结施-03"、图名"三层结构平面图"
@@ -129,4 +127,5 @@ cad-drawing-analyzer/
 ### 测试三：建筑平面图
 - ✅ 识别 6 樘窗、4 樘门，提取门编号和宽度
 ### 回归验证
-13 项端到端测试全部通过 ✅
+- 13 项端到端测试全部通过 ✅
+- `python tests/smoke_test.py`：8 条冒烟断言全部通过 ✅（清点 / 转换探测 / 目录 / 专业 / 算量 / WBS / Excel / 流水线）
