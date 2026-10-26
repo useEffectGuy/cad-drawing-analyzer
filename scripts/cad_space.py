@@ -23,27 +23,23 @@ import re
 import sys
 from collections import Counter, defaultdict
 from datetime import datetime
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from cad_common import (  # noqa: E402
+    Out,
+    add_output_args,
+    dxf_attr as _dxf_attr,
+    ensure_dxf_input as _ensure_dxf_input,
+    normalize as _norm,
+    round_num as _round,
+)
+
 try:
     import ezdxf
     import networkx as nx
 except ImportError as e:
     print(f"[ERROR] 缺少依赖: {e}，请执行: pip install ezdxf networkx", file=sys.stderr)
     sys.exit(1)
-
-def _ensure_dxf_input(path: str) -> str:
-    """若输入是 DWG，自动转换为 DXF（需要系统安装 ODA/LibreDWG）。"""
-    if not path.lower().endswith(".dwg"):
-        return path
-    try:
-        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-        from cad_convert import ensure_dxf
-        print("[INFO] 检测到 DWG 文件，正在自动转换为 DXF...")
-        dxf = ensure_dxf(path)
-        print(f"[INFO] 转换完成: {dxf}")
-        return dxf
-    except Exception as e:
-        print(f"[ERROR] {e}", file=sys.stderr)
-        sys.exit(2)
 
 # ---------------------------------------------------------------- 常量
 # 墙线图层关键词（用于封闭区域检测）
@@ -53,18 +49,6 @@ TITLE_BLOCK_KEYWORDS = ["图号", "图名", "设计", "审核", "制图", "比�
 # 标高正则：如 +3.000、-0.050、±0.000
 ELEVATION_PATTERN = re.compile(r"[+\-±]\s?\d+\.\d{3}")
 # ---------------------------------------------------------------- 工具
-def _dxf_attr(entity, name, default=None):
-    try:
-        return entity.dxf.get(name, default)
-    except Exception:
-        return default
-def _round(v, n=3):
-    try:
-        return round(float(v), n)
-    except Exception:
-        return v
-def _norm(s) -> str:
-    return (s or "").strip().upper()
 def _is_wall_layer(layer: str) -> bool:
     up = _norm(layer)
     return any(_norm(k) in up for k in WALL_KEYWORDS)

@@ -17,6 +17,7 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from cad_common import dxf_attr as _dxf_attr  # noqa: E402
 
 try:
     import ezdxf
@@ -38,12 +39,6 @@ DRAWING_NAME_KEYWORDS = [
     "平面图", "立面图", "剖面图", "大样图", "详图", "节点图", "系统图",
     "总平面图", "流程图", "原理图", "布置图", "示意图",
 ]
-
-def _dxf_attr(entity, name, default=None):
-    try:
-        return entity.dxf.get(name, default)
-    except Exception:
-        return default
 
 def detect_titleblock(dxf_path: str) -> dict:
     """检测图框并提取图签信息。"""

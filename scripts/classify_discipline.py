@@ -16,38 +16,14 @@ import os
 import re
 import sys
 
-# 图号前缀 → 专业 映射
-DRAWING_NO_PREFIX_MAP = {
-    "建施": "建筑", "JZ": "建筑", "JS": "建筑", "A": "建筑",
-    "结施": "结构", "JG": "结构", "GS": "结构", "S": "结构",
-    "水施": "给排水", "SS": "给排水", "PS": "给排水", "P": "给排水", "水": "给排水",
-    "暖施": "暖通", "NS": "暖通", "M": "暖通", "通施": "暖通", "TS": "暖通",
-    "电施": "电气", "DS": "电气", "E": "电气", "强电": "电气", "弱电": "电气",
-    "设施": "给排水", "FS": "给排水",
-    "装施": "装饰", "ZS": "装饰", "DE": "装饰",
-    "总图": "总图", "总": "总图", "L": "总图", "Z": "总图",
-    "消施": "消防", "XF": "消防", "消防": "消防",
-    "智施": "智能建筑", "智能": "智能建筑",
-}
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from cad_common import Out, add_output_args, load_discipline_dict  # noqa: E402
 
-# 图名关键词 → 专业
-DRAWING_NAME_KEYWORDS = {
-    "建筑": ["建施", "建筑", "平面", "立面", "剖面", "门窗", "楼梯", "卫生间", "厨房", "阳台"],
-    "结构": ["结施", "结构", "柱", "梁", "板", "基础", "钢筋", "承台", "剪力墙", "配筋", "平法"],
-    "给排水": ["水施", "给排水", "给水", "排水", "雨水", "污水", "消火栓", "喷淋", "管道", "阀门", "地漏", "水泵"],
-    "暖通": ["暖施", "暖通", "风管", "风口", "空调", "风机", "冷媒", "冷凝水", "排烟", "新风", "采暖"],
-    "电气": ["电施", "电气", "照明", "插座", "开关", "配电箱", "桥架", "电缆", "防雷", "接地", "强电", "弱电", "回路"],
-    "消防": ["消防", "火灾报警", "喷淋", "消火栓", "烟感", "温感"],
-    "总图": ["总平面", "红线", "道路", "绿化", "坐标", "竖向", "场地"],
-    "装饰": ["装饰", "装修", "地面", "墙面", "天花", "饰面"],
-    "智能建筑": ["智能", "弱电", "监控", "门禁", "网络", "综合布线"],
-}
-
-# 专业排序（GB 50300 十大分部顺序优先）
-DISCIPLINE_ORDER = [
-    "总图", "建筑", "结构", "给排水", "消防", "暖通", "电气",
-    "智能建筑", "装饰", "建筑节能", "电梯", "其他",
-]
+# 三张表统一来自 rules/discipline_dict.yaml（脚本只查表）
+_D = load_discipline_dict()
+DRAWING_NO_PREFIX_MAP = _D.drawing_no_prefix
+DRAWING_NAME_KEYWORDS = _D.name_keywords
+DISCIPLINE_ORDER = _D.order
 
 def classify_by_drawing_no(drawing_no: str) -> str | None:
     """根据图号前缀判定专业。"""
@@ -126,7 +102,9 @@ def main():
     ap = argparse.ArgumentParser(description="专业分类（工作流步骤④）")
     ap.add_argument("catalog", help="catalog.json 路径")
     ap.add_argument("--out", required=True, help="输出分类后的 catalog JSON 路径")
+    add_output_args(ap)
     args = ap.parse_args()
+    out = Out.from_args(args)
 
     with open(args.catalog, "r", encoding="utf-8") as f:
         catalog = json.load(f)
@@ -135,9 +113,8 @@ def main():
     os.makedirs(os.path.dirname(os.path.abspath(args.out)) or ".", exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(result, f, ensure_ascii=False, indent=2)
-    print(f"[OK] 专业分类完成: {args.out}")
-    for disc, count in result["discipline_stats"].items():
-        print(f"     {disc}: {count} 张")
+    stats = "，".join(f"{k} {v}" for k, v in result["discipline_stats"].items())
+    out.ok("专业分类", args.out, f"{len(result['items'])} 张", stats)
 
 if __name__ == "__main__":
     main()

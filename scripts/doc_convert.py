@@ -22,10 +22,10 @@ import os
 import re
 import sys
 from datetime import datetime
-def _ensure_dir(path: str):
-    d = os.path.dirname(os.path.abspath(path))
-    if d:
-        os.makedirs(d, exist_ok=True)
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from cad_common import ensure_dir as _ensure_dir  # noqa: E402
+
 # ---------------------------------------------------------------- 读取各格式
 def read_any(path: str) -> dict:
     """统一读取，返回 {type, title, headers, rows, paragraphs}"""

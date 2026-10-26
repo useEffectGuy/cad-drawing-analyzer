@@ -21,8 +21,15 @@ import os
 import re
 import sys
 from collections import Counter, defaultdict
+from functools import partial
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from cad_common import Out, add_output_args  # noqa: E402
+from cad_common import dxf_attr as _dxf_attr, round_num  # noqa: E402
+
+# measure_dxf 历史上保留 2 位小数，其余脚本为 3 位；此处显式固定，避免行为漂移
+_round = partial(round_num, n=2)
 
 try:
     import ezdxf
@@ -37,18 +44,6 @@ SPEC_PATTERNS = {
     "cable": re.compile(r"(YJV|BV|VV|KVV|ZR|NH)[\w\-*×/]*", re.IGNORECASE),
     "rebar": re.compile(r"[ΦØ]\d+[@]\d+", re.IGNORECASE),
 }
-
-def _dxf_attr(entity, name, default=None):
-    try:
-        return entity.dxf.get(name, default)
-    except Exception:
-        return default
-
-def _round(v, n=2):
-    try:
-        return round(float(v), n)
-    except Exception:
-        return v
 
 def _extract_spec_from_attrib(insert) -> str:
     """从 INSERT 块属性中提取型号规格。"""
@@ -191,7 +186,9 @@ def main():
     ap = argparse.ArgumentParser(description="工程量量算（工作流步骤⑤）")
     ap.add_argument("drawing", help="DXF/DWG 图纸路径")
     ap.add_argument("--out", required=True, help="输出 quantities.json 路径")
+    add_output_args(ap)
     args = ap.parse_args()
+    out = Out.from_args(args)
 
     try:
         from convert_dwg import ensure_dxf
@@ -204,10 +201,14 @@ def main():
     os.makedirs(os.path.dirname(os.path.abspath(args.out)) or ".", exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(result, f, ensure_ascii=False, indent=2)
-    print(f"[OK] 工程量量算完成: {args.out}")
     s = result["summary"]
-    print(f"     构件类型: {s['block_types']}，总数: {s['block_total']}")
-    print(f"     线长图层: {s['length_layers']}，面积图层: {s['area_layers']}")
+    out.ok(
+        "量算",
+        args.out,
+        f"{s['block_types']} 类构件 / {s['block_total']} 个",
+        f"线长图层 {s['length_layers']}",
+        f"面积图层 {s['area_layers']}",
+    )
 
 if __name__ == "__main__":
     main()

@@ -31,6 +31,10 @@ import json
 import os
 import sys
 from datetime import datetime
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from cad_common import ensure_dir as _ensure_dir  # noqa: E402
+
 try:
     from docx import Document
     from docx.shared import Pt, Cm, RGBColor
@@ -42,10 +46,6 @@ except ImportError:
     print("[ERROR] 缺少依赖 python-docx，请执行: pip install python-docx", file=sys.stderr)
     sys.exit(1)
 # ---------------------------------------------------------------- 工具
-def _ensure_dir(path: str):
-    d = os.path.dirname(os.path.abspath(path))
-    if d:
-        os.makedirs(d, exist_ok=True)
 def _set_cjk_font(run, cn_font="宋体", en_font="Times New Roman", size=12,
                   bold=False, color=None):
     """设置中英文字体（中文必须同时设 eastAsia，否则不生效）。"""

@@ -20,6 +20,7 @@ import sys
 from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from cad_common import Out, add_output_args  # noqa: E402
 
 # 图纸目录标题关键词
 CATALOG_TITLE_KEYWORDS = ["图纸目录", "图 纸 目 录", "图纸索引", "图 纸 索 引", "目  录"]
@@ -221,17 +222,17 @@ def main():
     ap = argparse.ArgumentParser(description="图纸目录提取（工作流步骤③）")
     ap.add_argument("input", help="图纸文件或目录路径")
     ap.add_argument("--out", required=True, help="输出 catalog.json 路径")
+    add_output_args(ap)
     args = ap.parse_args()
+    out = Out.from_args(args)
 
     result = extract_catalog(args.input)
     os.makedirs(os.path.dirname(os.path.abspath(args.out)) or ".", exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(result, f, ensure_ascii=False, indent=2)
-    print(f"[OK] 目录提取完成: {args.out}")
-    print(f"     来源: {result['source']}")
-    print(f"     图纸数量: {result['total_sheets']}")
+    out.ok("目录", args.out, f"{result['total_sheets']} 张", f"来源 {result['source']}")
     if result["out_of_catalog_files"]:
-        print(f"     目录外文件: {result['out_of_catalog_files']}")
+        out.detail(f"     目录外文件: {result['out_of_catalog_files']}")
 
 if __name__ == "__main__":
     main()

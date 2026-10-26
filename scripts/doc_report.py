@@ -20,69 +20,11 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import subprocess
 import sys
 from datetime import datetime
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-def _run(script: str, args: list) -> tuple:
-    """运行同目录下的脚本，返回 (成功, stdout, 输出路径)。"""
-    cmd = [sys.executable, os.path.join(SCRIPT_DIR, script)] + args
-    try:
-        r = subprocess.run(cmd, capture_output=True, text=True,
-                           encoding="utf-8", errors="replace", timeout=300)
-        return r.returncode == 0, r.stdout, r.stderr
-    except Exception as e:
-        return False, "", str(e)
-def run_pipeline(dxf: str, work_dir: str) -> dict:
-    """跑完整分析流水线，返回各步骤结果路径。"""
-    os.makedirs(work_dir, exist_ok=True)
-    base = os.path.splitext(os.path.basename(dxf))[0]
-    result = {"base": base, "steps": {}, "data": {}}
-    # 1. 基础解析
-    ok, out, err = _run("cad_inspect.py", [dxf, "--out", work_dir, "--json"])
-    result["steps"]["基础解析"] = ok
-    if ok:
-        jp = os.path.join(work_dir, f"{base}_分析数据.json")
-        if os.path.isfile(jp):
-            result["data"]["inspect"] = json.load(open(jp, encoding="utf-8"))
-    # 2. CIO 转换
-    cio_path = os.path.join(work_dir, f"{base}_CIO.json")
-    ok, out, err = _run("cad_cio.py", [dxf, "--out", cio_path])
-    result["steps"]["CIO转换"] = ok
-    if ok and os.path.isfile(cio_path):
-        result["data"]["cio"] = json.load(open(cio_path, encoding="utf-8"))
-    # 3. 空间识别
-    ok, out, err = _run("cad_space.py", [dxf, "--out", work_dir, "--json"])
-    result["steps"]["空间识别"] = ok
-    if ok:
-        jp = os.path.join(work_dir, f"{base}_空间识别数据.json")
-        if os.path.isfile(jp):
-            result["data"]["space"] = json.load(open(jp, encoding="utf-8"))
-    # 4. 工序识别（需 CIO）
-    if os.path.isfile(cio_path):
-        ok, out, err = _run("cad_process.py", [cio_path, "--out", work_dir, "--json"])
-        result["steps"]["工序识别"] = ok
-        if ok:
-            jp = os.path.join(work_dir, f"{base}_CIO_工序识别数据.json")
-            if os.path.isfile(jp):
-                result["data"]["process"] = json.load(open(jp, encoding="utf-8"))
-    # 5. 材料识别
-    if os.path.isfile(cio_path):
-        ok, out, err = _run("cad_material.py", [cio_path, "--out", work_dir, "--json"])
-        result["steps"]["材料识别"] = ok
-        if ok:
-            jp = os.path.join(work_dir, f"{base}_CIO_材料识别数据.json")
-            if os.path.isfile(jp):
-                result["data"]["material"] = json.load(open(jp, encoding="utf-8"))
-    # 6. 规则校验
-    if os.path.isfile(cio_path):
-        ok, out, err = _run("cad_rules.py", [cio_path, "--out", work_dir, "--json"])
-        result["steps"]["规则校验"] = ok
-        if ok:
-            jp = os.path.join(work_dir, f"{base}_CIO_审图结果.json")
-            if os.path.isfile(jp):
-                result["data"]["rules"] = json.load(open(jp, encoding="utf-8"))
-    return result
+sys.path.insert(0, SCRIPT_DIR)
+from run_pipeline import run_deep  # noqa: E402
 # ---------------------------------------------------------------- Word 报告
 def build_word_report(pipeline: dict, out_path: str) -> str:
     """把流水线结果组织成规范 Word 报告。"""
@@ -284,7 +226,7 @@ def main():
     work = args.work or os.path.join(args.out, "_work")
     base = os.path.splitext(os.path.basename(args.dxf))[0]
     print("[INFO] 正在跑分析流水线...")
-    pipeline = run_pipeline(args.dxf, work)
+    pipeline = run_deep(args.dxf, work)
     print("\n===== 流水线执行情况 =====")
     for step, ok in pipeline["steps"].items():
         print(f"  {'✅' if ok else '❌'} {step}")

@@ -22,6 +22,9 @@ import re
 import sys
 from collections import Counter, defaultdict
 from datetime import datetime
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 try:
     import yaml
 except ImportError:
@@ -116,20 +119,18 @@ class MaterialExtractor:
         }
 # ---------------------------------------------------------------- Excel 导出
 def export_excel(result: dict, out_path: str):
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Border, Side
+    except ImportError:
+        print("[ERROR] 缺少 openpyxl，请执行: pip install openpyxl", file=sys.stderr)
+        return None
+    from cad_common import xlsx_header
     wb = Workbook()
-    header_font = Font(bold=True, color="FFFFFF", size=11)
-    header_fill = PatternFill("solid", fgColor="1F4E79")
     thin = Side(style="thin", color="BFBFBF")
     border = Border(left=thin, right=thin, top=thin, bottom=thin)
     def style(ws, ncol):
-        for c in range(1, ncol + 1):
-            cell = ws.cell(row=1, column=c)
-            cell.font = header_font
-            cell.fill = header_fill
-            cell.alignment = Alignment(horizontal="center", vertical="center")
-            cell.border = border
+        xlsx_header(ws, ncol)
         ws.freeze_panes = "A2"
         for r in range(2, ws.max_row + 1):
             for c in range(1, ncol + 1):

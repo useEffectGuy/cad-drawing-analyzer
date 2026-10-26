@@ -25,27 +25,23 @@ import re
 import sys
 from collections import Counter, defaultdict
 from datetime import datetime
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from cad_common import (  # noqa: E402
+    Out,
+    add_output_args,
+    dxf_attr as _dxf_attr,
+    ensure_dxf_input as _ensure_dxf_input,
+    normalize as _norm,
+    round_num as _round,
+)
+
 try:
     import ezdxf
 except ImportError:
     print("[ERROR] 缺少依赖 ezdxf，请执行: pip install ezdxf", file=sys.stderr)
     sys.exit(1)
 CIO_SCHEMA_VERSION = "1.0.0"
-
-def _ensure_dxf_input(path: str) -> str:
-    """若输入是 DWG，自动转换为 DXF（需要系统安装 ODA/LibreDWG）。"""
-    if not path.lower().endswith(".dwg"):
-        return path
-    try:
-        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-        from cad_convert import ensure_dxf
-        print("[INFO] 检测到 DWG 文件，正在自动转换为 DXF...")
-        dxf = ensure_dxf(path)
-        print(f"[INFO] 转换完成: {dxf}")
-        return dxf
-    except Exception as e:
-        print(f"[ERROR] {e}", file=sys.stderr)
-        sys.exit(2)
 
 # ---------------------------------------------------------------- 分类词典
 # category 分类：按图层名/图块名关键词匹配，命中即归类
@@ -92,18 +88,6 @@ SUB_CATEGORY_RULES = [
     ("SOCKET_3HOLE", ["三孔", "3孔"]),
 ]
 # ---------------------------------------------------------------- 工具
-def _dxf_attr(entity, name, default=None):
-    try:
-        return entity.dxf.get(name, default)
-    except Exception:
-        return default
-def _round(v, n=3):
-    try:
-        return round(float(v), n)
-    except Exception:
-        return v
-def _norm(s) -> str:
-    return (s or "").strip().upper()
 def _make_entity_id(dxf_handle: str, dxf_type: str, layer: str, index: int) -> str:
     """生成确定性 entity_id：优先用 DXF handle，无则用内容哈希。"""
     seed = f"{dxf_handle}|{dxf_type}|{layer}|{index}"

@@ -5,12 +5,15 @@
 用法:
     # 从 PDF 提取表格（门窗表/材料表/设备表）
     python parse_tables.py <图纸.pdf> --out <输出目录>/tables.json
+    # 同时产出矢量几何量算（长度/面积/计数）
+    python parse_tables.py <图纸.pdf> --out work/tables.json --geometry work/pdf_quantities.json --pdf-scale 100
     # 从 DXF 中提取表格文字（块属性/文字排列）
     python parse_tables.py <图纸.dxf> --out tables.json
 功能:
     1. 矢量 PDF：pdfplumber 提取表格，自动识别表头
-    2. DXF：从块属性和邻近文字中提取表格式数据
-    3. 输出结构化 JSON，供后续工程量汇总
+    2. 可选 --geometry：调用 measure_pdf 统计线条长度、矩形面积、图元数量
+    3. DXF：从块属性和邻近文字中提取表格式数据
+    4. 输出结构化 JSON，供后续工程量汇总（tables.json 结构保持不变）
 依赖: pdfplumber（PDF），ezdxf（DXF），openpyxl（导出 Excel）
 """
 from __future__ import annotations
@@ -21,6 +24,7 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from cad_common import Out, add_output_args  # noqa: E402
 
 # 表格类型识别关键词
 TABLE_TYPE_KEYWORDS = {
@@ -130,39 +134,22 @@ def parse_dxf_tables(dxf_path: str) -> list:
 def to_excel(tables: list, out_path: str):
     """将提取的表格导出为 Excel（每个表一个 sheet）。"""
     try:
-        from openpyxl import Workbook
-        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        import openpyxl  # noqa: F401
     except ImportError:
         print("[ERROR] 缺少 openpyxl，请执行: pip install openpyxl", file=sys.stderr)
         return
-    wb = Workbook()
-    wb.remove(wb.active)
-    header_font = Font(bold=True, color="FFFFFF", size=11, name="微软雅黑")
-    header_fill = PatternFill("solid", fgColor="1F4E79")
-    thin = Side(style="thin", color="BFBFBF")
-    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    from cad_common import xlsx_auto_width, xlsx_body, xlsx_header, xlsx_new
+    wb = xlsx_new()
     for idx, t in enumerate(tables):
         name = f"{t['type']}_{idx+1}"[:31]
         ws = wb.create_sheet(title=name)
         ws.append(t["headers"])
-        for cell in ws[1]:
-            cell.font = header_font
-            cell.fill = header_fill
-            cell.alignment = Alignment(horizontal="center", vertical="center")
-            cell.border = border
+        xlsx_header(ws, len(t["headers"]))
         for row in t["rows"]:
             ws.append(row)
-        for row in ws.iter_rows(min_row=2):
-            for cell in row:
-                cell.border = border
-        # 自动列宽
-        for col in ws.columns:
-            maxlen = 0
-            for cell in col:
-                if cell.value:
-                    w = sum(2 if ord(c) > 127 else 1 for c in str(cell.value))
-                    maxlen = max(maxlen, w)
-            ws.column_dimensions[col[0].column_letter].width = min(maxlen + 2, 40)
+        xlsx_body(ws)
+        # 自动列宽（保持原行为：无最小宽度限制）
+        xlsx_auto_width(ws, min_w=0, max_w=40)
     wb.save(out_path)
 
 # ---------------------------------------------------------------- 入口
@@ -171,7 +158,13 @@ def main():
     ap.add_argument("input", help="PDF 或 DXF 文件路径")
     ap.add_argument("--out", required=True, help="输出 JSON 路径")
     ap.add_argument("--excel", help="可选：导出 Excel 路径")
+    ap.add_argument("--geometry", nargs="?", const="", default=None,
+                    help="可选：同时输出 PDF 矢量几何量算 JSON；不指定路径时写到 --out 同目录的 pdf_quantities.json")
+    ap.add_argument("--pdf-scale", type=float, default=1.0,
+                    help="几何量算的图纸比例分母，如 1:100 传 100（默认 1:1）")
+    add_output_args(ap)
     args = ap.parse_args()
+    out = Out.from_args(args)
 
     ext = os.path.splitext(args.input)[1].lower()
     if ext == ".pdf":
@@ -188,13 +181,29 @@ def main():
     os.makedirs(os.path.dirname(os.path.abspath(args.out)) or ".", exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(tables, f, ensure_ascii=False, indent=2)
-    print(f"[OK] 提取到 {len(tables)} 个表格: {args.out}")
-    for t in tables:
-        print(f"     - 第{t['page']}页 {t['type']}（{t['row_count']}行）")
+    out.ok("表格", args.out, f"{len(tables)} 个表")
 
     if args.excel:
         to_excel(tables, args.excel)
-        print(f"[OK] Excel 导出: {args.excel}")
+        out.ok("Excel", args.excel)
+
+    if args.geometry is not None:
+        if ext != ".pdf":
+            out.detail("     [WARN] --geometry 仅支持矢量 PDF，已忽略")
+        else:
+            from measure_pdf import measure_pdfs
+            geo_path = args.geometry or os.path.join(
+                os.path.dirname(os.path.abspath(args.out)) or ".", "pdf_quantities.json")
+            geo = measure_pdfs([args.input], args.pdf_scale)
+            os.makedirs(os.path.dirname(os.path.abspath(geo_path)) or ".", exist_ok=True)
+            with open(geo_path, "w", encoding="utf-8") as f:
+                json.dump(geo, f, ensure_ascii=False, indent=2)
+            t = geo["totals"]
+            out.ok("PDF几何量算", geo_path,
+                   f"线条 {t['line_count']} 条 / {t['line_length_m']} m",
+                   f"矩形面积 {t['rect_area_m2']} m²")
+            for err in geo["errors"]:
+                out.detail(f"     [WARN] {err}")
 
 if __name__ == "__main__":
     main()

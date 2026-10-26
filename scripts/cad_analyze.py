@@ -21,95 +21,30 @@ import re
 import sys
 from collections import Counter, defaultdict
 from datetime import datetime
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from cad_common import (  # noqa: E402
+    Out,
+    add_output_args,
+    dxf_attr as _dxf_attr,
+    ensure_dxf_input as _ensure_dxf_input,
+    load_discipline_dict,
+    normalize as _norm,
+    round_num as _round,
+)
+
 try:
     import ezdxf
 except ImportError:
     print("[ERROR] 缺少依赖 ezdxf，请先执行: pip install ezdxf", file=sys.stderr)
     sys.exit(1)
 
-def _ensure_dxf_input(path: str) -> str:
-    """若输入是 DWG，自动转换为 DXF（需要系统安装 ODA/LibreDWG）。"""
-    if not path.lower().endswith(".dwg"):
-        return path
-    try:
-        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-        from cad_convert import ensure_dxf
-        print("[INFO] 检测到 DWG 文件，正在自动转换为 DXF...")
-        dxf = ensure_dxf(path)
-        print(f"[INFO] 转换完成: {dxf}")
-        return dxf
-    except Exception as e:
-        print(f"[ERROR] {e}", file=sys.stderr)
-        sys.exit(2)
-
 # ---------------------------------------------------------------- 专业词典
 # 每个专业：关键词 -> 权重（图层名权重最高，因为图层是制图规范的第一组织维度）
-DISCIPLINE_DICT = {
-    "建筑": {
-        "layer": {"墙": 3, "门": 3, "窗": 3, "轴线": 3, "楼梯": 3, "房间": 2, "标高": 2,
-                  "WALL": 3, "DOOR": 3, "WINDOW": 3, "AXIS": 3, "STAIR": 3, "FLOOR": 2,
-                  "ARCH": 2, "建": 2},
-        "block": {"门": 3, "窗": 3, "楼梯": 3, "洁具": 2, "家具": 2, "DOOR": 3, "WINDOW": 3},
-        "text": {"平面图": 3, "立面图": 3, "剖面图": 3, "房间": 2, "卫生间": 2,
-                 "办公室": 2, "会议室": 2, "走廊": 2, "建筑面积": 3},
-    },
-    "结构": {
-        "layer": {"柱": 3, "梁": 3, "板": 3, "基础": 3, "钢筋": 3, "承台": 3, "剪力墙": 3,
-                  "COLUMN": 3, "BEAM": 3, "SLAB": 3, "REBAR": 3, "FOUND": 3, "STRU": 2},
-        "block": {"柱": 3, "梁": 3, "桩": 3, "COLUMN": 3, "BEAM": 3},
-        "text": {"配筋": 3, "混凝土": 2, "钢筋": 3, "结构": 3, "承台": 3, "梁平法": 3},
-    },
-    "给排水": {
-        "layer": {"给水": 3, "排水": 3, "雨水": 3, "污水": 3, "消火栓": 3, "喷淋": 3,
-                  "管道": 3, "阀门": 3, "地漏": 3, "WATER": 3, "DRAIN": 3, "PIPE": 3,
-                  "PLUMB": 2, "SPRINK": 3},
-        "block": {"阀门": 3, "地漏": 3, "消火栓": 3, "喷头": 3, "水泵": 3, "洁具": 2},
-        "text": {"给水": 3, "排水": 3, "DN": 3, "管径": 3, "消火栓": 3, "喷淋": 3,
-                 "给排水": 3, "系统图": 2},
-    },
-    "电气": {
-        "layer": {"照明": 3, "插座": 3, "开关": 3, "配电箱": 3, "桥架": 3, "电缆": 3,
-                  "防雷": 3, "接地": 3, "LIGHT": 3, "POWER": 3, "SOCKET": 3,
-                  "ELEC": 3, "CABLE": 3, "TRAY": 3},
-        "block": {"灯具": 3, "插座": 3, "开关": 3, "配电箱": 3, "LIGHT": 3, "SOCKET": 3},
-        "text": {"照明": 3, "插座": 3, "配电": 3, "电气": 3, "BV": 3, "YJV": 3,
-                 "回路": 3, "配电箱": 3, "强电": 3, "弱电": 3},
-    },
-    "暖通": {
-        "layer": {"风管": 3, "风口": 3, "空调": 3, "风机": 3, "冷媒": 3, "冷凝水": 3,
-                  "保温": 2, "DUCT": 3, "AHU": 3, "FCU": 3, "HVAC": 3},
-        "block": {"风口": 3, "风机": 3, "空调": 3, "阀": 2, "DUCT": 3},
-        "text": {"风管": 3, "风口": 3, "空调": 3, "暖通": 3, "排烟": 3, "新风": 3,
-                 "冷负荷": 3, "风量": 3},
-    },
-    "总图": {
-        "layer": {"红线": 3, "道路": 3, "绿化": 3, "坐标": 3, "场地": 3, "竖向": 3,
-                  "REDLINE": 3, "ROAD": 3, "SITE": 3},
-        "block": {"指北针": 3, "坐标": 3, "树": 2, "车": 2},
-        "text": {"总平面": 3, "红线": 3, "坐标": 3, "道路": 3, "绿化": 3, "竖向": 3},
-    },
-    "装饰": {
-        "layer": {"地面": 3, "墙面": 3, "天花": 3, "踢脚": 3, "造型": 3, "饰面": 3,
-                  "FLOOR": 2, "CEILING": 3, "DECO": 3},
-        "block": {"家具": 3, "灯具": 2, "洁具": 2, "饰面": 3},
-        "text": {"装饰": 3, "装修": 3, "地面": 3, "墙面": 3, "天花": 3, "材料表": 3},
-    },
-}
+# 数据唯一来源：rules/discipline_dict.yaml（content_weights 节）
+DISCIPLINE_DICT = load_discipline_dict().weights()
 # 图例区常见标题关键词
 LEGEND_TITLE_KEYWORDS = ["图例", "图 例", "LEGEND", "符号表", "图例表", "说明", "设计说明"]
-# ---------------------------------------------------------------- 工具
-def _dxf_attr(entity, name, default=None):
-    try:
-        return entity.dxf.get(name, default)
-    except Exception:
-        return default
-def _round(v, n=3):
-    try:
-        return round(float(v), n)
-    except Exception:
-        return v
-def _norm(s: str) -> str:
-    return (s or "").strip().upper()
 # ---------------------------------------------------------------- 1. 专业识别
 class DisciplineClassifier:
     """基于图层名/图块名/文字的三重加权投票，判定图纸专业。"""

@@ -24,27 +24,22 @@ import re
 import sys
 from collections import Counter, defaultdict
 from datetime import datetime
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from cad_common import (  # noqa: E402
+    Out,
+    add_output_args,
+    dxf_attr as _dxf_attr,
+    ensure_dxf_input,
+    round_num as _round,
+)
+
 try:
     import ezdxf
     from ezdxf import bbox
 except ImportError:
     print("[ERROR] 缺少依赖 ezdxf，请先执行: pip install ezdxf", file=sys.stderr)
     sys.exit(1)
-
-def _ensure_dxf_input(path: str) -> str:
-    """若输入是 DWG，自动转换为 DXF（需要系统安装 ODA/LibreDWG）。"""
-    if not path.lower().endswith(".dwg"):
-        return path
-    try:
-        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-        from cad_convert import ensure_dxf
-        print("[INFO] 检测到 DWG 文件，正在自动转换为 DXF...")
-        dxf = ensure_dxf(path)
-        print(f"[INFO] 转换完成: {dxf}")
-        return dxf
-    except Exception as e:
-        print(f"[ERROR] {e}", file=sys.stderr)
-        sys.exit(2)
 
 # ---------------------------------------------------------------- 常量
 # 系统块前缀（*Model_Space、*Paper_Space 等）与标注箭头块（_ARCHTICK 等）
@@ -63,17 +58,6 @@ UNITS_MAP = {
     18: "Astronomical(天文单位)", 19: "Light years(光年)", 20: "Parsecs(秒差距)",
 }
 # ---------------------------------------------------------------- 工具函数
-def _dxf_attr(entity, name, default=None):
-    """安全读取 entity.dxf.<name>。"""
-    try:
-        return entity.dxf.get(name, default)
-    except Exception:
-        return default
-def _round(v, n=3):
-    try:
-        return round(float(v), n)
-    except Exception:
-        return v
 def _call_bool(obj, method_name: str, default: bool = False) -> bool:
     """安全调用返回 bool 的方法（如 Layer.is_off()）。"""
     try:
@@ -546,42 +530,63 @@ def write_markdown(res: dict, out_path: str):
     A("*本报告由 CAD 图纸分析技能自动生成，数据来源于 DXF 文件解析结果。*")
     with open(out_path, "w", encoding="utf-8") as f:
         f.write("\n".join(L))
+# ---------------------------------------------------------------- 对外接口
+def inspect_dxf(dxf_path: str, out_dir: str = ".", as_json: bool = False) -> dict:
+    """完整 DXF 体检：解析 + 写 Markdown 报告 + 可选 JSON，返回结果字典。
+
+    供 cad_inspect 自身的 CLI 与 inspect_dxf.py 复用，避免两处逻辑分叉。
+    """
+    dxf_path = ensure_dxf_input(dxf_path)
+    os.makedirs(out_dir, exist_ok=True)
+    base = os.path.splitext(os.path.basename(dxf_path))[0]
+    res = CadInspector(dxf_path).run_all()
+    write_markdown(res, os.path.join(out_dir, f"{base}_分析报告.md"))
+    if as_json:
+        with open(os.path.join(out_dir, f"{base}_分析数据.json"), "w", encoding="utf-8") as f:
+            json.dump(res, f, ensure_ascii=False, indent=2)
+    return res
+
+
 # ---------------------------------------------------------------- 入口
 def main():
     ap = argparse.ArgumentParser(description="CAD DXF 图纸解析与统计")
     ap.add_argument("dxf", help="DXF 图纸路径")
     ap.add_argument("--out", default=".", help="报告输出目录")
     ap.add_argument("--json", action="store_true", help="同时输出 JSON")
+    add_output_args(ap)
     args = ap.parse_args()
-    # DWG 自动转换
-    args.dxf = _ensure_dxf_input(args.dxf)
+    out = Out.from_args(args)
+
     os.makedirs(args.out, exist_ok=True)
     base = os.path.splitext(os.path.basename(args.dxf))[0]
     try:
-        inspector = CadInspector(args.dxf)
-        res = inspector.run_all()
+        res = inspect_dxf(args.dxf, args.out, args.json)
     except Exception as e:
         print(f"[ERROR] 解析失败: {e}", file=sys.stderr)
         sys.exit(2)
+
     md_path = os.path.join(args.out, f"{base}_分析报告.md")
-    write_markdown(res, md_path)
-    print(f"[OK] Markdown 报告: {md_path}")
+    ov = res["overview"]
+    out.ok(
+        "体检",
+        md_path,
+        f"{ov['file_name']}",
+        f"实体 {ov['modelspace_entities']}/图层 {ov['layer_count']}",
+        f"块插入 {res['blocks']['insert_total']}",
+        f"问题 {res['quality_check']['issue_count']}",
+    )
     if args.json:
         json_path = os.path.join(args.out, f"{base}_分析数据.json")
-        with open(json_path, "w", encoding="utf-8") as f:
-            json.dump(res, f, ensure_ascii=False, indent=2)
-        print(f"[OK] JSON 数据: {json_path}")
-    ov = res["overview"]
-    print("\n===== 图纸摘要 =====")
-    print(f"文件      : {ov['file_name']}")
-    print(f"DXF版本   : {ov['dxf_version']}")
-    print(f"图形单位  : {ov['units_name']}")
-    print(f"实体总数  : {ov['modelspace_entities']}")
-    print(f"图层数    : {ov['layer_count']}")
-    print(f"块定义数  : {ov['block_definitions']}")
-    print(f"块插入数  : {res['blocks']['insert_total']}")
-    print(f"文字数    : {res['texts']['total']}")
-    print(f"标注数    : {res['dimensions']['total']}")
-    print(f"问题项    : {res['quality_check']['issue_count']}")
+        out.detail(f"[OK] JSON 数据: {json_path}")
+    out.detail(
+        "===== 图纸摘要 =====",
+        f"DXF版本   : {ov['dxf_version']}",
+        f"图形单位  : {ov['units_name']}",
+        f"块定义数  : {ov['block_definitions']}",
+        f"文字数    : {res['texts']['total']}",
+        f"标注数    : {res['dimensions']['total']}",
+    )
+
+
 if __name__ == "__main__":
     main()

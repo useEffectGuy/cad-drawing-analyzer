@@ -13,6 +13,10 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from cad_common import ensure_dxf_input as _ensure_dxf_input  # noqa: E402
+
 try:
     import matplotlib
     matplotlib.use("Agg")
@@ -24,21 +28,6 @@ try:
 except ImportError as e:
     print(f"[ERROR] 缺少依赖: {e}\n请执行: pip install ezdxf matplotlib", file=sys.stderr)
     sys.exit(1)
-
-def _ensure_dxf_input(path: str) -> str:
-    """若输入是 DWG，自动转换为 DXF（需要系统安装 ODA/LibreDWG）。"""
-    if not path.lower().endswith(".dwg"):
-        return path
-    try:
-        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-        from cad_convert import ensure_dxf
-        print("[INFO] 检测到 DWG 文件，正在自动转换为 DXF...")
-        dxf = ensure_dxf(path)
-        print(f"[INFO] 转换完成: {dxf}")
-        return dxf
-    except Exception as e:
-        print(f"[ERROR] {e}", file=sys.stderr)
-        sys.exit(2)
 
 def _setup_cjk_font():
     """尝试配置中文字体，避免图中中文乱码。"""

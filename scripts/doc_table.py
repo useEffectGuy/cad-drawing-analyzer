@@ -31,6 +31,10 @@ import json
 import os
 import sys
 from datetime import datetime
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from cad_common import ensure_dir as _ensure_dir  # noqa: E402
+
 try:
     from openpyxl import Workbook, load_workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -49,10 +53,6 @@ THIN = Side(style="thin", color="BFBFBF")
 BORDER = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
 TITLE_FONT = Font(bold=True, size=14, name="微软雅黑", color="1F4E79")
 # ---------------------------------------------------------------- 工具
-def _ensure_dir(path: str):
-    d = os.path.dirname(os.path.abspath(path))
-    if d:
-        os.makedirs(d, exist_ok=True)
 def _parse_rows(rows_str: str) -> list:
     """解析 'a,b,c|d,e,f' 格式的行数据。"""
     if not rows_str:

@@ -16,6 +16,16 @@ import json
 import os
 import sys
 from datetime import datetime
+from functools import partial
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from cad_common import Out, add_output_args, classify_layer  # noqa: E402
+from cad_common import xlsx_auto_width as _auto_width  # noqa: E402
+from cad_common import xlsx_header  # noqa: E402
+
+# 汇总表表头需要换行，保持改造前行为
+_style_header = partial(xlsx_header, wrap=True)
+
 
 def _load_json(path: str) -> dict:
     if not os.path.isfile(path):
@@ -23,42 +33,20 @@ def _load_json(path: str) -> dict:
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
-def _style_header(ws, ncol):
-    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-    header_font = Font(bold=True, color="FFFFFF", size=11, name="微软雅黑")
-    header_fill = PatternFill("solid", fgColor="1F4E79")
-    thin = Side(style="thin", color="BFBFBF")
-    border = Border(left=thin, right=thin, top=thin, bottom=thin)
-    for c in range(1, ncol + 1):
-        cell = ws.cell(row=1, column=c)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-        cell.border = border
 
-def _auto_width(ws, min_w=8, max_w=40):
-    from openpyxl.utils import get_column_letter
-    for col in ws.columns:
-        first = col[0]
-        col_idx = getattr(first, "column", None)
-        if col_idx is None:
-            continue
-        letter = get_column_letter(col_idx)
-        maxlen = 0
-        for cell in col:
-            v = getattr(cell, "value", None)
-            if v is not None:
-                s = str(v)
-                w = sum(2 if ord(c) > 127 else 1 for c in s)
-                maxlen = max(maxlen, w)
-        ws.column_dimensions[letter].width = min(max(maxlen + 2, min_w), max_w)
+def _load_catalog(work_dir: str) -> dict:
+    """优先使用补全专业字段的 catalog_classified.json。"""
+    classified = os.path.join(work_dir, "catalog_classified.json")
+    if os.path.isfile(classified):
+        return _load_json(classified)
+    return _load_json(os.path.join(work_dir, "catalog.json"))
 
 def generate_excel(work_dir: str, out_path: str):
     """生成汇总 Excel。"""
     from openpyxl import Workbook
     from openpyxl.styles import Font, Alignment, Border, Side
 
-    catalog = _load_json(os.path.join(work_dir, "catalog.json"))
+    catalog = _load_catalog(work_dir)
     quantities = _load_json(os.path.join(work_dir, "quantities.json"))
     wbs = _load_json(os.path.join(work_dir, "wbs.json"))
 
@@ -99,17 +87,7 @@ def generate_excel(work_dir: str, out_path: str):
     disc_blocks = defaultdict(list)
     for b in block_table:
         layer = list(b.get("layers", {}).keys())[0] if b.get("layers") else ""
-        disc = "其他"
-        for d, kws in {
-            "建筑": ["墙", "门", "窗", "WALL", "DOOR", "建"],
-            "结构": ["柱", "梁", "板", "COLUMN", "BEAM", "结"],
-            "给排水": ["水", "PIPE", "DRAIN", "WATER", "排"],
-            "电气": ["灯", "插座", "ELEC", "LIGHT", "电"],
-            "暖通": ["风", "DUCT", "HVAC", "暖"],
-        }.items():
-            if any(k.upper() in layer.upper() for k in kws):
-                disc = d
-                break
+        disc = classify_layer(layer) or "其他"
         disc_blocks[disc].append(b)
 
     for disc, blocks in disc_blocks.items():
@@ -199,7 +177,7 @@ def generate_excel(work_dir: str, out_path: str):
 
 def generate_report(work_dir: str, out_path: str) -> str:
     """生成 Markdown 分析报告。"""
-    catalog = _load_json(os.path.join(work_dir, "catalog.json"))
+    catalog = _load_catalog(work_dir)
     quantities = _load_json(os.path.join(work_dir, "quantities.json"))
     wbs = _load_json(os.path.join(work_dir, "wbs.json"))
 
@@ -285,14 +263,16 @@ def main():
     ap.add_argument("work_dir", help="work 目录路径（含 catalog.json/quantities.json/wbs.json）")
     ap.add_argument("--out", required=True, help="输出 Excel 路径")
     ap.add_argument("--report", help="可选：输出 Markdown 报告路径")
+    add_output_args(ap)
     args = ap.parse_args()
+    out = Out.from_args(args)
 
     excel_path = generate_excel(args.work_dir, args.out)
-    print(f"[OK] Excel 汇总: {excel_path}")
+    out.ok("汇总", excel_path, "Excel")
 
     if args.report:
         report_path = generate_report(args.work_dir, args.report)
-        print(f"[OK] 分析报告: {report_path}")
+        out.ok("报告", report_path, "Markdown")
 
 if __name__ == "__main__":
     main()

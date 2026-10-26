@@ -27,6 +27,7 @@ except ImportError:
 
 # 复用 cad_inspect 的完整体检逻辑
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from cad_common import Out, add_output_args  # noqa: E402
 try:
     from cad_inspect import inspect_dxf as _inspect_dxf_full
 except ImportError:
@@ -96,7 +97,9 @@ def main():
     ap.add_argument("--inventory", nargs="+", help="批量输入清点：目录或文件列表")
     ap.add_argument("--out", required=True, help="输出路径（JSON 文件或目录）")
     ap.add_argument("--json", action="store_true", help="输出 JSON 格式")
+    add_output_args(ap)
     args = ap.parse_args()
+    out = Out.from_args(args)
 
     os.makedirs(os.path.dirname(os.path.abspath(args.out)) or ".", exist_ok=True)
 
@@ -104,29 +107,34 @@ def main():
         result = inventory(args.inventory)
         with open(args.out, "w", encoding="utf-8") as f:
             json.dump(result, f, ensure_ascii=False, indent=2)
-        print(f"[OK] 输入清点完成：{result['total_files']} 个文件")
-        print(f"     格式分布: {result['format_counts']}")
-        if result["large_files"]:
-            print(f"     大图纸（需切片）: {result['large_files']}")
-        print(f"     输出: {args.out}")
+        out.ok(
+            "清点",
+            args.out,
+            f"{result['total_files']} 个文件",
+            f"格式 {result['format_counts']}",
+        )
+        out.detail(
+            f"     大图纸（需切片）: {result['large_files']}" if result["large_files"] else "",
+        )
         return
 
     if not args.drawing:
         ap.error("请指定图纸路径，或使用 --inventory 进行批量清点")
 
-    # 单张体检：优先复用 cad_inspect 完整逻辑
+    # 单张体检：复用 cad_inspect 完整逻辑（失败才降级）
     if _inspect_dxf_full is not None:
-        # cad_inspect 的主逻辑；若接口不匹配则降级
         try:
             _inspect_dxf_full(args.drawing, args.out, args.json)
+            base = os.path.splitext(os.path.basename(args.drawing))[0]
+            out.ok("体检", os.path.join(args.out, f"{base}_分析报告.md"), "完整体检")
             return
         except Exception as e:
             print(f"[WARN] 完整体检失败，降级为基础体检: {e}", file=sys.stderr)
 
     # 降级：基础体检
     try:
-        from convert_dwg import ensure_dxf
-        dxf_path = ensure_dxf(args.drawing)
+        from cad_common import ensure_dxf_input
+        dxf_path = ensure_dxf_input(args.drawing)
         doc = ezdxf.readfile(dxf_path)
         msp = doc.modelspace()
         layers = [l.dxf.name for l in doc.layers]
@@ -144,7 +152,7 @@ def main():
         }
         with open(args.out, "w", encoding="utf-8") as f:
             json.dump(result, f, ensure_ascii=False, indent=2)
-        print(f"[OK] 基础体检完成: {args.out}")
+        out.ok("基础体检", args.out, f"实体 {result['entity_total']}")
     except Exception as e:
         print(f"[ERROR] {e}", file=sys.stderr)
         sys.exit(2)

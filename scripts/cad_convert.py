@@ -153,33 +153,35 @@ def ensure_dxf(path: str, out_dir: str | None = None) -> str:
         raise RuntimeError(f"DWG 转换失败：{result}")
     return result
 # ---------------------------------------------------------------- 入口
-def main():
+def main(argv=None):
     ap = argparse.ArgumentParser(description="DWG → DXF 自动转换")
-    ap.add_argument("dwg", help="DWG 文件路径")
+    ap.add_argument("dwg", nargs="?", help="DWG 文件路径")
     ap.add_argument("--out", default=None, help="输出 DXF 路径")
     ap.add_argument("--detect", action="store_true", help="仅探测转换工具，不执行转换")
-    args = ap.parse_args()
+    g = ap.add_mutually_exclusive_group()
+    g.add_argument("--quiet", action="store_true", help="仅输出结果路径")
+    g.add_argument("--verbose", action="store_true", help="输出完整明细")
+    args = ap.parse_args(argv)
     if args.detect:
         conv = detect_converter()
-        print("===== DWG 转换工具探测 =====")
         if conv["found"]:
-            print(f"[OK] 找到: {conv['tool']}")
-            print(f"     路径: {conv['path']}")
+            print(f"[OK] 找到: {conv['tool']}  {conv['path']}")
         else:
             print("[MISS] 未找到 DWG→DXF 转换工具")
-            print("\n安装建议：")
-            print("  1. ODA File Converter（免费，推荐）")
-            print("     https://www.opendesign.com/guestfiles/oda_file_converter")
-            print("  2. LibreDWG（开源）")
-            print("     https://www.gnu.org/software/libredwg/")
-            print("  3. 用 CAD 软件打开后另存为 DXF")
+            if not args.quiet:
+                print("安装建议：")
+                print("  1. ODA File Converter（免费，推荐）https://www.opendesign.com/guestfiles/oda_file_converter")
+                print("  2. LibreDWG（开源）https://www.gnu.org/software/libredwg/")
+                print("  3. 用 CAD 软件打开后另存为 DXF")
         return
+    if not args.dwg:
+        ap.error("请指定 DWG 文件路径，或使用 --detect 仅探测工具")
     try:
         dxf = ensure_dxf(args.dwg, os.path.dirname(args.out) if args.out else None)
         if args.out and os.path.abspath(dxf) != os.path.abspath(args.out):
             shutil.move(dxf, args.out)
             dxf = args.out
-        print(f"[OK] 转换完成: {dxf}")
+        print(dxf if args.quiet else f"[OK] 转换完成: {dxf}")
     except Exception as e:
         print(f"[ERROR] {e}", file=sys.stderr)
         sys.exit(2)

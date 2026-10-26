@@ -1,0 +1,95 @@
+# ============================================================
+# 消防专项审图规则库 (Fire Rule DSL)
+# ============================================================
+# 与 default_rules.yaml 同构，可单独加载：
+#   python scripts/cad_rules.py <图名>_CIO.json \
+#       --rules rules/fire_rules.yaml --enable-cross-discipline --out work --json
+#
+# 字段说明：id / name / category / severity / enabled / condition / action / reference
+#
+# condition 算子（本文件仅使用 cad_rules.py 已注册的算子）：
+#   zero_length_line / zero_radius_circle / duplicate_entity
+#   block_attr_empty / text_height_lt
+#   entity_bbox_overlap / layer_pair_distance_lt / discipline_mismatch
+#
+# 说明：
+#   - category=cross_discipline 的规则涉及专业间碰撞或一致性判断，
+#     默认不执行，需加 --enable-cross-discipline 显式启用；
+#   - 其余规则按 enabled 字段执行；
+#   - 阈值单位与 CIO 图形单位一致，毫米图纸由规则引擎按 global_context.units 自动换算。
+# ============================================================
+version: "1.0"
+description: 消防专项审图规则（消火栓、喷淋、火灾报警、防排烟）
+rules:
+  # ---------------- 跨专业：净距与碰撞 ----------------
+  - id: FIRE001
+    name: 消火栓箱与结构构件净距不足
+    category: cross_discipline
+    severity: error
+    enabled: true
+    condition:
+      operator: layer_pair_distance_lt
+      layer_a_keywords: ["消火栓", "消防栓", "XHS", "FIRE HYDRANT", "HYDRANT"]
+      layer_b_keywords: ["柱", "梁", "COLUMN", "BEAM"]
+      threshold: 200
+    action: "发现 {count} 处消火栓箱与柱/梁距离小于 {threshold} 图形单位，请核查安装净距"
+    reference: "GB 50974-2014 第 7.3 节；GB 50016-2014（2018年版）第 8.2 节"
+
+  - id: FIRE002
+    name: 喷淋管道与风管碰撞
+    category: cross_discipline
+    severity: error
+    enabled: true
+    condition:
+      operator: entity_bbox_overlap
+      layer_a_keywords: ["喷淋", "SPRINK", "消防管", "FIRE PIPE"]
+      layer_b_keywords: ["风管", "DUCT", "排烟"]
+      tolerance: 0.0
+    action: "发现 {count} 处喷淋管道与风管包围盒重叠，可能存在碰撞，需核查标高与翻弯"
+    reference: "GB 50084-2017 第 7.1 节；GB 50243-2016"
+
+  - id: FIRE003
+    name: 消防专业混入其他专业图层
+    category: cross_discipline
+    severity: info
+    enabled: true
+    condition:
+      operator: discipline_mismatch
+      expected_discipline: "消防"
+      forbidden_keywords: ["给水", "排水", "风管", "空调", "采暖"]
+    action: "图纸判定为消防专业，但发现 {count} 处给排水/暖通相关图层或文字，请确认是否多专业综合图"
+    reference: "制图规范：消防图纸宜按系统分层，避免与给排水/暖通图层混用"
+
+  # ---------------- 图元质量 ----------------
+  - id: FIRE004
+    name: 消防设备重复布置
+    category: geometry
+    severity: warning
+    enabled: true
+    condition:
+      operator: duplicate_entity
+      threshold: 1.0e-6
+    action: "发现 {count} 组位置完全重合的消防设备/管线图元，建议核查是否重复布置"
+    reference: "制图规范：同一位置不应重复插入设备图元"
+
+  - id: FIRE005
+    name: 消防喷头零半径圆
+    category: geometry
+    severity: info
+    enabled: true
+    condition:
+      operator: zero_radius_circle
+      threshold: 1.0e-6
+    action: "发现 {count} 个半径近似为 0 的圆（常见于喷头/探测器图元），建议清理"
+    reference: "制图规范：不应存在零半径图元"
+
+  - id: FIRE006
+    name: 消防说明文字高度过小
+    category: text
+    severity: info
+    enabled: true
+    condition:
+      operator: text_height_lt
+      threshold: 2.5
+    action: "{count} 处消防说明文字高度小于 {threshold} 图形单位，可能影响打印可读性"
+    reference: "制图规范：图纸说明文字应满足打印可读性要求"
