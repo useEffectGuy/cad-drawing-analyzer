@@ -10,7 +10,7 @@
 - **规则数据外置**：新增 `rules/discipline_dict.yaml`（专业词典唯一来源）与 `rules/gb50300_map.yaml`（WBS 映射唯一来源），代码只查表，不再与文档双源漂移。
 - **PDF 矢量几何量算**：新增 `measure_pdf.py`，统计线条长度、矩形面积与图元数量，产物 `pdf_quantities.json`；`parse_tables.py --geometry` 可一并产出，且 `tables.json` 既有结构不变。
 - **专业覆盖补齐**：新增智能建筑、建筑节能、电梯、消防 4 篇专业指引，以及消防专项规则库 `rules/fire_rules.yaml`（6 条规则）。
-- **冒烟测试**：新增 `tests/smoke_test.py`（8 条端到端断言）与测试用 DXF 生成器，`python tests/smoke_test.py` 即可运行，无需 pytest。
+- **冒烟测试**：`tests/smoke_test.py`（20 条端到端断言）与测试用 DXF 生成器，`python tests/smoke_test.py` 即可运行，无需 pytest。
 ## 系统架构
 ```
 DXF 图纸
@@ -32,7 +32,9 @@ DXF 图纸
 | `inspect_dxf.py` | 输入清点（文件数、格式、图层、图框概览） |
 | `extract_catalog.py` | 图纸目录表结构化提取 |
 | `classify_discipline.py` | 按图号/图名/图层关键词判定专业 |
-| `measure_dxf.py` | DXF 几何算量（线长、面积、图块计数） |
+| `measure_dxf.py` | DXF 几何算量（线长、面积、图块计数；按图层角色过滤 + 比例校准） |
+| `entity_pool.py` | 唯一 DXF 图元读取入口，按 MEASURABLE/FRAME/ANNOTATION… 解析图层角色 |
+| `unit_scale.py` | 图纸比例三级校准（$INSUNITS → 图签比例 → 图框/纸幅推断） |
 | `parse_tables.py` | PDF 表格提取（可选 `--geometry` 同步几何量算） |
 | `measure_pdf.py` | 矢量 PDF 长度/面积/计数，输出 `pdf_quantities.json` |
 | `map_wbs.py` | GB 50300 分部分项划分，映射表来自 `rules/gb50300_map.yaml` |
@@ -119,11 +121,14 @@ cad-drawing-analyzer/
 ├── requirements.txt              # Python 依赖
 ├── scripts/
 │   ├── run_pipeline.py           # 唯一编排入口（standard / deep / all）
+│   ├── contracts.py              # 契约/配置统一入口（--check 自检）
 │   ├── cad_common.py             # 公共基础设施（DXF/YAML/Excel）
 │   ├── inspect_dxf.py            # 输入清点
 │   ├── extract_catalog.py        # 图纸目录提取
 │   ├── classify_discipline.py    # 专业分类
-│   ├── measure_dxf.py            # DXF 算量
+│   ├── measure_dxf.py            # DXF 算量（图层角色过滤 + 比例校准）
+│   ├── entity_pool.py            # 图元池与图层角色解析（唯一 DXF 读取入口）
+│   ├── unit_scale.py             # 图纸比例三级校准
 │   ├── parse_tables.py           # PDF 表格提取
 │   ├── measure_pdf.py            # PDF 矢量几何量算
 │   ├── map_wbs.py                # GB 50300 分部分项映射
@@ -147,7 +152,21 @@ cad-drawing-analyzer/
 │   ├── doc_table.py              # Excel 表格工具箱
 │   └── doc_convert.py            # 文档格式互转
 ├── schemas/
-│   └── cio_schema.json           # CIO 数据契约 Schema
+│   ├── cio_schema.json           # CIO 数据契约 Schema
+│   ├── entity.schema.json        # L0 图元
+│   ├── perception_bundle.schema.json  # L1 感知结果
+│   ├── label_chain.schema.json   # L2 四级标签链
+│   ├── quantity_line.schema.json # L3 工程量行
+│   ├── material_line.schema.json # L4 材料行
+│   └── drawing_index.schema.json # L0 图纸索引
+├── config/
+│   ├── units.yaml                # 计量单位与精度（唯一真相源）
+│   ├── thresholds.yaml           # 置信度/几何容差/洞口阈值/比例校准阈值
+│   ├── deduction_priority.yaml   # 构件扣减优先级
+│   └── disciplines.yaml          # 专业注册与验收体系
+├── knowledge/
+│   └── layer_standards/
+│       └── base.yaml             # 图层角色库（MEASURABLE/FRAME/ANNOTATION…）
 ├── rules/
 │   ├── discipline_dict.yaml      # 专业词典唯一来源
 │   ├── gb50300_map.yaml          # WBS 映射唯一来源
@@ -162,7 +181,10 @@ cad-drawing-analyzer/
 │   └── disciplines/              # 9 个专业指引（含智能建筑/节能/电梯/消防）
 └── tests/
     ├── smoke_test.py             # 23 条端到端冒烟断言
-    └── fixtures/                   # DXF 生成器与金标准
+    └── fixtures/
+        ├── make_mini_dxf.py      # 基础测试 DXF 生成器
+        ├── make_quantity_dxf.py  # 工程量测试图生成器（1:100 图框/墙/门窗/梁筋/苗木）
+        └── quantity_expected.json # 工程量金标准（回归基线 + 目标口径）
 ```
 ## 实测效果
 ### 测试一：结构平面图（本次新增能力验证）
@@ -180,4 +202,5 @@ cad-drawing-analyzer/
 - ✅ 识别 6 樘窗、4 樘门，提取门编号和宽度
 ### 回归验证
 - 13 项端到端测试全部通过 ✅
-- `python tests/smoke_test.py -v`：23 条冒烟断言全部通过 ✅（清点 / 转换探测 / 目录 / 专业 / 算量 / WBS / Excel / 流水线 / 修复回归 / 契约自检）
+- `python tests/smoke_test.py -v`：23 条冒烟断言全部通过 ✅（清点 / 转换探测 / 目录 / 专业 / 算量 / WBS / Excel / 流水线 / 深链 / resume / quiet / PDF 量算 / YAML 缺失 / 文档一致性 / 工程量金标准 / 契约自检 / 版本戳 / 配置语义 / 契约校验 / 面积引擎 / 比例校准 / 图层角色 / 未识别图层）
+- `python scripts/contracts.py --check`：7 份 Schema + 4 份配置全量自检通过 ✅

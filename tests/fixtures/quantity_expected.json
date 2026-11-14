@@ -1,0 +1,75 @@
+{
+  "schema": "tzp.fixture.expected/1.0",
+  "fixture": "quantity.dxf",
+  "generator": "tests/fixtures/make_quantity_dxf.py",
+  "note": "regression = 当前口径实测基线（Phase 2 起已按图层角色过滤、按比例校准）；target = 后续阶段应达到的业务口径。",
+  "drawing": {
+    "scale": "1:100",
+    "paper": "A3",
+    "units": "mm",
+    "frame_area_m2": 1247.4
+  },
+  "regression": {
+    "summary": {
+      "block_types": 4,
+      "block_total": 11,
+      "length_layers": 3,
+      "area_layers": 1
+    },
+    "block_counts": {
+      "KZ1": 4,
+      "香樟": 3,
+      "M1021": 2,
+      "C1515": 2
+    },
+    "layer_length_m": {
+      "A-WALL": 31.0,
+      "S-BEAM": 13.0,
+      "P-PIPE": 8.0
+    },
+    "layer_area_m2": {
+      "A-WALL": 40.0
+    },
+    "excluded_layers": ["A-FRAME"],
+    "layer_roles": {
+      "A-FRAME": "FRAME",
+      "A-WALL": "MEASURABLE",
+      "A-DOOR": "MEASURABLE",
+      "S-COLUMN": "MEASURABLE",
+      "S-BEAM": "MEASURABLE",
+      "S-REBAR": "MEASURABLE",
+      "P-PIPE": "MEASURABLE",
+      "L-PLANT": "MEASURABLE",
+      "门窗表": "ANNOTATION",
+      "图例": "ANNOTATION",
+      "苗木表": "ANNOTATION"
+    },
+    "scale": {
+      "geometry_state": "MODEL_1_TO_1",
+      "scale_ratio": 100,
+      "factor_to_mm": 1.0,
+      "paper": "A3",
+      "calibrated_by": "TITLE_BLOCK",
+      "status": "OK"
+    }
+  },
+  "target": {
+    "room_count": 2,
+    "room_area_m2": 40.0,
+    "door_count": 2,
+    "door_opening_area_m2": 4.2,
+    "window_count": 2,
+    "window_opening_area_m2": 4.5,
+    "column_count": 4,
+    "column_section": "500×500",
+    "beam_length_m": 13.0,
+    "pipe_length_m": 8.0,
+    "tree_count": 3,
+    "frame_area_excluded": true,
+    "rebar": {
+      "grade": "HRB400",
+      "digits": "%%1328@200",
+      "note": "HRB400 φ8@200，理论重量 0.395 kg/m"
+    }
+  }
+}

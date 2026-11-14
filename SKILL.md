@@ -1,5 +1,5 @@
 ---
-name: cad-drawing-analyzer
+name: 图智通
 description: 图智通：DXF/DWG/PDF 图纸识别、目录与专业判定、工程量与分部分项、报告与审图问答。触发词：CAD/DXF/DWG/PDF、施工图、审图、算量、工程量、图纸问答。
 ---
 # 图智通（CAD 图纸识别与工程量统计分析）
@@ -43,6 +43,7 @@ description: 图智通：DXF/DWG/PDF 图纸识别、目录与专业判定、工�
 | 图签 / 图框 | `python scripts/detect_titleblock.py <图.dxf> --out work/meta.json` |
 | 专业分类 | `python scripts/classify_discipline.py work/catalog.json --out work/catalog_classified.json` |
 | DXF 几何 | `python scripts/measure_dxf.py <图.dxf> --out work/quantities.json` |
+| 比例校准 / 图层角色 | `python scripts/unit_scale.py <图.dxf> --out work/scale.json`；`entity_pool.py <图.dxf>` |
 | PDF 表格 / 几何 | `python scripts/parse_tables.py <图.pdf> --out work/tables.json`；`measure_pdf.py <图.pdf> --out work/pdf_quantities.json` |
 | 分部分项 WBS | `python scripts/map_wbs.py work/quantities.json --catalog work/catalog_classified.json --out work/wbs.json` |
 | 汇总出表 | `python scripts/aggregate.py work --out work/工程量汇总统计.xlsx --report work/分析报告.md` |
@@ -108,6 +109,13 @@ GB 50300-2013 附录 B 十大分部为主线。映射数据在 `rules/gb50300_ma
 | `references/dxf_entities.md` | 新增 DXF 实体解析 |
 | `references/analysis_dimensions.md` | 扩展分析维度与判断要点 |
 | `schemas/cio_schema.json` | 改 CIO 字段或校验规则 |
+| `schemas/{entity,perception_bundle,label_chain,quantity_line,material_line,drawing_index}.schema.json` | 改五层输出契约（L0→L4） |
+| `config/units.yaml` | 改计量单位与小数位（代码内禁止硬编码换算） |
+| `config/thresholds.yaml` | 改置信度、几何容差、洞口扣减阈值、待确认规则 |
+| `config/deduction_priority.yaml` | 改构件扣减优先级（按地区/合同切换） |
+| `config/disciplines.yaml` | 改专业注册、验收体系与清单专业归属 |
+| `scripts/contracts.py` | 统一加载/校验/版本戳入口；`--check` 做全量契约自检 |
+| `knowledge/layer_standards/base.yaml` | 改图层角色判定（MEASURABLE/FRAME/ANNOTATION…） |
 | `rules/discipline_dict.yaml` | 改专业词典与图层关键词 |
 | `rules/gb50300_map.yaml` | 改 WBS 映射表 |
 | `rules/{default_rules,process_rules,material_dict}.yaml` | 改审图/工序/材料规则 |
@@ -119,3 +127,5 @@ GB 50300-2013 附录 B 十大分部为主线。映射数据在 `rules/gb50300_ma
 - **大图纸控制输出量**。明细可能上万条，报告只展示前 N 条并注明"完整数据见 JSON"。
 - **专业识别是概率判断**。置信度低于 50% 时提示可能是多专业综合图或图层命名不规范。
 - **CIO 契约不可破坏**。任何模块输出都必须符合 `schemas/cio_schema.json`。
+- **配置是唯一真相源**。单位换算、精度、置信度、扣减优先级只能从 `config/` 读取；脚本内出现魔法数字或内置阈值副本视为缺陷。改动后用 `python scripts/contracts.py --check` 自检。
+- **中间产物必须带 `schema` 版本字段**。字段登记在 `scripts/contracts.py` 的 `INTERMEDIATE`，新增产物需同步登记。

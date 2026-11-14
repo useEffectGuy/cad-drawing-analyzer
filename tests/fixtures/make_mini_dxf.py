@@ -22,6 +22,7 @@ def build(path: str) -> str:
         os.makedirs(directory, exist_ok=True)
 
     doc = ezdxf.new("R2010", setup=True)
+    doc.header["$INSUNITS"] = 4  # 毫米（ezdxf 默认 6=米，与本图坐标不符）
     msp = doc.modelspace()
 
     for name, color in (

@@ -125,6 +125,7 @@ def build_wbs_tree(quantities: dict, catalog: dict = None) -> dict:
         })
 
     return {
+        "schema": "tzp.wbs/1.0",
         "standard": "GB 50300-2013",
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         "divisions": tree,

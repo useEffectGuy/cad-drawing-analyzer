@@ -27,6 +27,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from cad_common import Out, add_output_args  # noqa: E402
 from cad_common import dxf_attr as _dxf_attr, round_num  # noqa: E402
+from entity_pool import DXFEntityPool, EXCLUDED_ROLES  # noqa: E402
+from unit_scale import calibrate  # noqa: E402
 
 # measure_dxf 历史上保留 2 位小数，其余脚本为 3 位；此处显式固定，避免行为漂移
 _round = partial(round_num, n=2)
@@ -75,10 +77,61 @@ def _extract_spec_from_layer(layer: str, block_name: str) -> str:
             return m.group(0)
     return ""
 
+SCHEMA = "tzp.quantities/1.0"
+
+
+def _shoelace(pts) -> float:
+    """鞋带公式求多边形面积（绝对值）。点序不要求显式闭合。"""
+    n = len(pts)
+    if n < 3:
+        return 0.0
+    s = 0.0
+    for i in range(n):
+        x1, y1 = pts[i][0], pts[i][1]
+        x2, y2 = pts[(i + 1) % n][0], pts[(i + 1) % n][1]
+        s += x1 * y2 - x2 * y1
+    return abs(s) / 2.0
+
+
+def entity_area(e) -> float:
+    """确定性求闭合图元面积。
+
+    ezdxf 1.x 的 LWPOLYLINE / HATCH 均无 .area() 方法，旧实现靠 try/except 会
+    静默归零；此处改为读取顶点后鞋带公式计算，避免面积通道整体失效。
+    """
+    t = e.dxftype()
+    try:
+        if t == "LWPOLYLINE":
+            if not e.closed:
+                return 0.0
+            return _shoelace([(p[0], p[1]) for p in e.get_points()])
+        if t == "POLYLINE":
+            if not getattr(e, "is_closed", False):
+                return 0.0
+            return _shoelace([(v.dxf.location.x, v.dxf.location.y) for v in e.vertices])
+        if t == "HATCH":
+            from ezdxf import path as ezpath
+            total = 0.0
+            for p in ezpath.from_hatch(e):
+                total += _shoelace([(v.x, v.y) for v in p.flattening(0.5)])
+            return total
+    except Exception:
+        return 0.0
+    return 0.0
+
+
 def measure_dxf(dxf_path: str) -> dict:
-    """量算 DXF 工程量：面积、长度、计数。"""
-    doc = ezdxf.readfile(dxf_path)
-    msp = doc.modelspace()
+    """量算 DXF 工程量：面积、长度、计数。
+
+    几何量算只统计 MEASURABLE 图层；FRAME/AXIS/ANNOTATION/FILL/AUXILIARY 进
+    excluded，UNKNOWN 进 unclassified（不得静默丢弃）。所有数值按比例校准结果
+    factor_to_mm 换算为真实毫米。
+    """
+    pool = DXFEntityPool(dxf_path)
+    msp = pool.msp
+    scale = calibrate(pool)
+    factor = float(scale["factor_to_mm"])
+    stats = pool.statistics()
 
     # 1. 构件计数（INSERT）+ 型号规格提取
     block_qty = Counter()
@@ -86,6 +139,8 @@ def measure_dxf(dxf_path: str) -> dict:
     block_layers = defaultdict(Counter)
     for e in msp:
         if e.dxftype() != "INSERT":
+            continue
+        if pool.role(e) in EXCLUDED_ROLES:
             continue
         name = _dxf_attr(e, "name", "UNKNOWN")
         layer = _dxf_attr(e, "layer", "0")
@@ -110,10 +165,14 @@ def measure_dxf(dxf_path: str) -> dict:
             "specs": specs,
         })
 
-    # 2. 线长统计（按图层）
+    # 2. 线长统计（按图层，仅 MEASURABLE）
     layer_length = defaultdict(float)
     for e in msp:
         t = e.dxftype()
+        if t not in ("LINE", "LWPOLYLINE", "ARC", "CIRCLE", "SPLINE"):
+            continue
+        if pool.role(e) != "MEASURABLE":
+            continue
         layer = _dxf_attr(e, "layer", "0")
         try:
             if t == "LINE":
@@ -144,35 +203,63 @@ def measure_dxf(dxf_path: str) -> dict:
             continue
 
     length_table = [
-        {"layer": k, "total_length_mm": _round(v), "total_length_m": _round(v / 1000), "unit": "m"}
+        {
+            "layer": k,
+            "total_length_mm": _round(v * factor),
+            "total_length_m": _round(v * factor / 1000),
+            "unit": "m",
+        }
         for k, v in sorted(layer_length.items(), key=lambda x: -x[1]) if v > 0
     ]
 
-    # 3. 闭合区域面积（按图层）
+    # 3. 闭合区域面积（按图层，仅 MEASURABLE）
     layer_area = defaultdict(float)
     for e in msp:
-        if e.dxftype() == "LWPOLYLINE":
-            try:
-                if e.closed:
-                    layer_area[_dxf_attr(e, "layer", "0")] += abs(e.area())
-            except Exception:
-                continue
-        elif e.dxftype() == "HATCH":
-            try:
-                layer_area[_dxf_attr(e, "layer", "0")] += abs(e.area())
-            except Exception:
-                continue
+        if e.dxftype() not in ("LWPOLYLINE", "POLYLINE", "HATCH"):
+            continue
+        if pool.role(e) != "MEASURABLE":
+            continue
+        a = entity_area(e)
+        if a > 0:
+            layer_area[_dxf_attr(e, "layer", "0")] += a
 
     area_table = [
-        {"layer": k, "total_area_mm2": _round(v), "total_area_m2": _round(v / 1e6), "unit": "m²"}
+        {
+            "layer": k,
+            "total_area_mm2": _round(v * factor * factor),
+            "total_area_m2": _round(v * factor * factor / 1e6),
+            "unit": "m²",
+        }
         for k, v in sorted(layer_area.items(), key=lambda x: -x[1]) if v > 0
     ]
 
+    excluded = {}
+    for role in EXCLUDED_ROLES:
+        count = stats["role_counts"].get(role, 0)
+        if count:
+            excluded[role] = {
+                "entity_count": count,
+                "layers": stats["role_layers"].get(role, []),
+            }
+    unclassified = stats["unclassified"]
+    pending = list(scale.get("pending") or [])
+    if unclassified["entity_count"]:
+        pending.append(
+            f"{unclassified['entity_count']} 个图元位于未识别图层 "
+            f"{unclassified['layers']}，未计入几何量算"
+        )
+
     return {
+        "schema": SCHEMA,
         "file": os.path.basename(dxf_path),
+        "scale": scale,
+        "layer_roles": stats["layer_roles"],
         "block_table": block_table,
         "length_table": length_table,
         "area_table": area_table,
+        "excluded": excluded,
+        "unclassified": unclassified,
+        "pending": pending,
         "summary": {
             "block_types": len(block_table),
             "block_total": sum(b["quantity"] for b in block_table),

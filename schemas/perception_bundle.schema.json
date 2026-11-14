@@ -1,0 +1,157 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://tuzhitong.local/schemas/perception_bundle.schema.json",
+  "title": "PerceptionBundle（L1 感知结果）",
+  "description": "L2 的唯一输入。文字/图例/表格/标注/视觉语义五路并列；视觉结果只允许进入语义与交叉校验通道，不得写入几何量值。",
+  "type": "object",
+  "required": ["schema", "sheets"],
+  "additionalProperties": true,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "pattern": "^tzp\\.perception_bundle/\\d+\\.\\d+$"
+    },
+    "generated_at": { "type": "string" },
+    "sheets": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/sheet" }
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "definitions": {
+    "sheet": {
+      "type": "object",
+      "required": ["sheet_id"],
+      "additionalProperties": true,
+      "properties": {
+        "sheet_id": { "type": "string" },
+        "drawing_no": { "type": ["string", "null"] },
+        "discipline": { "type": ["string", "null"] },
+        "texts": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/text_record" }
+        },
+        "legend_entries": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/legend_entry" }
+        },
+        "tables": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/table_record" }
+        },
+        "annotations": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/annotation" }
+        },
+        "vision_semantics": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/vision_semantic" }
+        }
+      }
+    },
+    "text_record": {
+      "type": "object",
+      "required": ["text", "entity_id"],
+      "additionalProperties": true,
+      "properties": {
+        "text": { "type": "string" },
+        "entity_id": { "type": "string" },
+        "bbox": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 4,
+          "maxItems": 4
+        },
+        "source": {
+          "type": "string",
+          "enum": ["VECTOR", "PDF_VECTOR", "OCR", "SHX_RECOVERED"]
+        },
+        "raw": { "type": ["string", "null"], "description": "清洗前原文" }
+      }
+    },
+    "legend_entry": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": true,
+      "properties": {
+        "name": { "type": "string" },
+        "spec": { "type": ["string", "null"] },
+        "block_name": { "type": ["string", "null"] },
+        "symbol_entity_id": { "type": ["string", "null"] },
+        "matched_entity_ids": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "table_record": {
+      "type": "object",
+      "required": ["table_id", "kind", "headers", "rows"],
+      "additionalProperties": true,
+      "properties": {
+        "table_id": { "type": "string" },
+        "kind": {
+          "type": "string",
+          "enum": ["DOOR_WINDOW", "REBAR", "PLANT", "EQUIPMENT", "MEMBER", "GENERAL", "UNKNOWN"]
+        },
+        "headers": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "source_entity_id": { "type": ["string", "null"] },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "annotation": {
+      "type": "object",
+      "required": ["text"],
+      "additionalProperties": true,
+      "properties": {
+        "annotation_id": { "type": ["string", "null"] },
+        "text": { "type": "string" },
+        "target_entity_ids": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "leader_entity_id": { "type": ["string", "null"] },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "vision_semantic": {
+      "type": "object",
+      "required": ["label", "bbox", "cross_check_status"],
+      "additionalProperties": true,
+      "properties": {
+        "label": { "type": "string", "description": "语义判断结果，如“卫生间防水做法”" },
+        "bbox": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 4,
+          "maxItems": 4
+        },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "cross_check_status": {
+          "type": "string",
+          "enum": ["CONSISTENT", "CONFLICT", "UNVERIFIED"],
+          "description": "CONFLICT 必须进入待确认清单"
+        },
+        "compare_with": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "参与比对的结构化证据 entity_id"
+        }
+      }
+    }
+  }
+}

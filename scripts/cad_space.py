@@ -485,6 +485,7 @@ def main():
     assignment = sd.assign_components(space.get("spaces", []))
     elevation = ElevationParser(doc).parse()
     result = {
+        "schema": "tzp.space/1.0",
         "file_name": os.path.basename(args.dxf),
         "analyzed_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "frame": frame,

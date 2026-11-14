@@ -80,6 +80,7 @@ def inventory(inputs: list) -> dict:
         })
         fmt_counts[ext.lstrip(".")] = fmt_counts.get(ext.lstrip("."), 0) + 1
     return {
+        "schema": "tzp.inventory/1.0",
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         "total_files": len(items),
         "format_counts": fmt_counts,

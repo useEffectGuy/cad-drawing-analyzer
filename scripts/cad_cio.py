@@ -35,6 +35,8 @@ from cad_common import (  # noqa: E402
     normalize as _norm,
     round_num as _round,
 )
+from entity_pool import layer_role  # noqa: E402
+from unit_scale import calibrate  # noqa: E402
 
 try:
     import ezdxf
@@ -387,6 +389,7 @@ class CioConverter:
             ent = {
                 "entity_id": _make_entity_id(handle, t, layer, idx),
                 "category": cat,
+                "layer_role": layer_role(layer),
                 "geometry": _extract_geometry(e),
                 "attributes": {
                     "layer_name": layer,
@@ -451,6 +454,10 @@ class CioConverter:
         layers_frozen = [l.dxf.name for l in self.doc.layers if _call_bool(l, "is_frozen")]
         # 用户块定义清单（供"未使用块"规则）
         block_defs = [b.name for b in self.doc.blocks if not b.name.startswith(("*", "_"))]
+        # 比例校准：CIO 契约的 scale_ratio 语义为 模型/实际（1:100 → 0.01）
+        calibration = calibrate(self.doc)
+        scale_ratio = (round(1.0 / calibration["scale_ratio"], 6)
+                       if calibration.get("scale_ratio") else None)
         global_context = {
             "units": units_map.get(units_code, f"code_{units_code}"),
             "extents": extents,
@@ -459,7 +466,8 @@ class CioConverter:
             "layers_off": layers_off,
             "layers_frozen": layers_frozen,
             "block_definitions": block_defs,
-            "scale_ratio": None,
+            "scale_ratio": scale_ratio,
+            "scale_calibration": calibration,
             "elevation_base": None,
         }
         return {

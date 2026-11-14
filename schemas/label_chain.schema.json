@@ -1,0 +1,97 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://tuzhitong.local/schemas/label_chain.schema.json",
+  "title": "LabelChain（四级标签链）",
+  "description": "L2 输出。专业 → 单位工程 → 分部 → 分项。GB 50300 验收码与 GB/T 50500 清单码并存，不得混用。",
+  "type": "object",
+  "required": ["discipline", "unit_work", "division", "subitem", "confidence", "evidence"],
+  "additionalProperties": true,
+  "properties": {
+    "discipline": {
+      "type": "object",
+      "required": ["code", "name"],
+      "additionalProperties": true,
+      "properties": {
+        "code": { "type": "string", "examples": ["ARCH", "STRU", "PLUMB", "HVAC", "ELEC", "MUNI", "LAND"] },
+        "name": { "type": "string" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "unit_work": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": true,
+      "properties": {
+        "name": { "type": "string", "description": "单位工程，如“建筑与装饰工程”“给排水工程”" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "division": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": true,
+      "properties": {
+        "name": { "type": "string", "description": "分部工程，如“主体结构”“建筑装饰装修”" },
+        "gb50300_code": { "type": ["string", "null"], "description": "GB 50300 分部验收编码" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "subitem": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": true,
+      "properties": {
+        "name": { "type": "string", "description": "分项工程，如“钢筋”“混凝土”“管道安装”" },
+        "gb50300_code": { "type": ["string", "null"] },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "boq": {
+      "type": "object",
+      "description": "GB/T 50500 清单口径（与验收码分离）",
+      "additionalProperties": true,
+      "properties": {
+        "project_code": {
+          "type": "string",
+          "description": "9 位国家清单编码；补充项为 9 位 + B + 3 位顺序码"
+        },
+        "project_name": { "type": "string" },
+        "feature_template": {
+          "type": "string",
+          "description": "项目特征模板，如“混凝土强度等级:{grade};截面:{section}”"
+        },
+        "unit": { "type": "string" },
+        "is_supplement": { "type": "boolean", "default": false }
+      }
+    },
+    "acceptance_standard": {
+      "type": "string",
+      "enum": ["GB50300", "MUNICIPAL", "LANDSCAPE", "OTHER"],
+      "description": "验收体系。市政/园林不得套用房建 GB 50300 分部树"
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "整条链的综合置信度，取各层最小值"
+    },
+    "evidence": {
+      "type": "array",
+      "description": "支撑该标签链的证据引用，至少一条",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["type", "ref"],
+        "additionalProperties": true,
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["LAYER", "BLOCK_NAME", "TEXT", "TABLE", "DIMENSION", "LEGEND", "SHEET", "RULE"]
+          },
+          "ref": { "type": "string" },
+          "detail": { "type": "string" }
+        }
+      }
+    }
+  }
+}

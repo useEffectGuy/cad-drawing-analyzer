@@ -1,0 +1,65 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://tuzhitong.local/schemas/material_line.schema.json",
+  "title": "MaterialLine（材料行）",
+  "description": "L4 材料汇总行。配合比口径与经验密度口径并列输出，便于造价复核选择，不得只留一条。",
+  "type": "object",
+  "required": ["material", "spec", "unit", "quantity", "derivation_path", "source_level"],
+  "additionalProperties": true,
+  "properties": {
+    "material": {
+      "type": "string",
+      "enum": [
+        "钢筋", "水泥", "砂", "石", "混凝土", "砂浆", "砌体",
+        "管材", "阀门", "管件", "电缆", "桥架", "设备",
+        "苗木", "草皮", "模板", "保温材料", "防水材料", "其他"
+      ]
+    },
+    "spec": {
+      "type": "string",
+      "description": "规格/强度等级/材质，如 HRB400 φ8、C30、PPR De25"
+    },
+    "unit": {
+      "type": "string",
+      "enum": ["kg", "t", "m3", "m2", "m", "个", "套", "株", "樘", "m²", "m³"]
+    },
+    "quantity": { "type": "number" },
+    "derivation_path": {
+      "type": "array",
+      "description": "推导路径，如 [分项工程量, 配合比, 材料用量]",
+      "minItems": 1,
+      "items": { "type": "string" }
+    },
+    "basis": {
+      "type": "string",
+      "enum": ["MIX_RATIO", "DENSITY", "THEORETICAL_WEIGHT", "COUNT", "EXPERIENCE"],
+      "description": "换算依据。同一材料允许两条口径并列（MIX_RATIO 与 DENSITY）"
+    },
+    "source_level": {
+      "type": "string",
+      "enum": ["DIRECT", "DERIVED", "ESTIMATED", "PENDING"]
+    },
+    "formula": { "type": "string" },
+    "conversion_factor": {
+      "type": "number",
+      "description": "所用换算系数，如钢筋 0.395 kg/m"
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "ref"],
+        "additionalProperties": true,
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["QUANTITY_LINE", "TABLE", "RULE", "FORMULA", "MATERIAL_DICT"]
+          },
+          "ref": { "type": "string" },
+          "drawing_no": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "notes": { "type": "array", "items": { "type": "string" } }
+  }
+}

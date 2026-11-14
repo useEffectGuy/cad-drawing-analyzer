@@ -1,0 +1,100 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://tuzhitong.local/schemas/quantity_line.schema.json",
+  "title": "QuantityLine（工程量行）",
+  "description": "L3 输出、L4 唯一输入。每个数值必须可追溯到图元或规则；无证据的数值只能是 PENDING，不得进入正式汇总。",
+  "type": "object",
+  "required": [
+    "line_id",
+    "project_code",
+    "name",
+    "feature",
+    "unit",
+    "quantity",
+    "source_level",
+    "evidence"
+  ],
+  "additionalProperties": true,
+  "allOf": [
+    {
+      "if": {
+        "properties": { "source_level": { "enum": ["DIRECT", "DERIVED"] } }
+      },
+      "then": {
+        "properties": {
+          "evidence": { "minItems": 1 }
+        }
+      }
+    }
+  ],
+  "properties": {
+    "line_id": { "type": "string" },
+    "label_chain": { "$ref": "label_chain.schema.json" },
+    "project_code": {
+      "type": "string",
+      "pattern": "^(\\d{9}|\\d{9}B\\d{3})$",
+      "description": "GB/T 50500 清单编码（9 位）或补充编码（9 位+B+3 位）"
+    },
+    "name": { "type": "string", "minLength": 1, "description": "清单项目名称" },
+    "feature": {
+      "type": "string",
+      "minLength": 1,
+      "description": "项目特征描述，用于组价；不得为空，未知时写“待确认”"
+    },
+    "unit": {
+      "type": "string",
+      "enum": ["m", "m2", "m3", "kg", "t", "个", "樘", "株", "套", "项", "处", "m²", "m³", "㎡"]
+    },
+    "quantity": {
+      "type": "number",
+      "minimum": 0,
+      "description": "工程量。PENDING 时可为 0，但必须同时出现在待确认清单"
+    },
+    "source_level": {
+      "type": "string",
+      "enum": ["DIRECT", "DERIVED", "ESTIMATED", "PENDING"],
+      "description": "DIRECT=图纸直接提取；DERIVED=规范推导；ESTIMATED=经验估算；PENDING=待确认"
+    },
+    "evidence": {
+      "type": "array",
+      "description": "证据链。DIRECT/DERIVED 至少一条；ESTIMATED 允许为空但需 notes",
+      "items": {
+        "type": "object",
+        "required": ["type", "ref"],
+        "additionalProperties": true,
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["ENTITY", "SHEET", "TABLE", "DIMENSION", "RULE", "FORMULA"]
+          },
+          "ref": { "type": "string", "description": "entity_id / 图号 / 规则名 / 公式" },
+          "drawing_no": { "type": ["string", "null"] },
+          "layer": { "type": ["string", "null"] },
+          "bbox": {
+            "type": "array",
+            "items": { "type": "number" },
+            "minItems": 4,
+            "maxItems": 4
+          }
+        }
+      }
+    },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "formula": {
+      "type": "string",
+      "description": "计算式，如 length × breadth × height；便于复核"
+    },
+    "entity_ids": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "构成该行的图元 ID 列表（溯源到图元池）"
+    },
+    "drawing_no": { "type": ["string", "null"] },
+    "deduction_notes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "扣减记录，如“扣除门窗洞 4.2 m²”"
+    },
+    "notes": { "type": "array", "items": { "type": "string" } }
+  }
+}

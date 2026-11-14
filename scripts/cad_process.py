@@ -183,6 +183,7 @@ class ProcessEngine:
             p["stage"] = _stage(p["sequence_order"])
         stage_summary = Counter(p["stage"] for p in all_processes)
         return {
+            "schema": "tzp.process/1.0",
             "rules_version": self.version,
             "matched_entities": len(results),
             "total_entities": len(cio.get("parsed_entities", [])),

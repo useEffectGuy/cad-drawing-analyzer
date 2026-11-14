@@ -1,0 +1,44 @@
+# 计量单位与精度策略 —— 唯一真相源
+# 任何脚本不得在代码内硬编码单位换算或小数位；一律通过 contracts.load_config("units") 读取。
+version: "1.0"
+
+length:
+  drawing_default: mm          # 施工图默认绘图单位
+  output: m                    # 输出工程量单位
+  factor_to_mm:
+    mm: 1.0
+    cm: 10.0
+    m: 1000.0
+    inch: 25.4
+    ft: 304.8
+    unitless: 1.0              # 无单位时按 mm 处理，但必须标记 PENDING
+
+area:
+  output: m2
+  factor_to_m2_from_mm2: 0.000001
+
+volume:
+  output: m3
+  factor_to_m3_from_mm3: 0.000000001
+
+weight:
+  output: kg
+  ton_to_kg: 1000.0
+
+# DXF $INSUNITS → 图纸单位。0 为 unitless，不得静默按 mm 处理
+dxf_insunits:
+  "0": unitless
+  "1": inch
+  "2": ft
+  "4": mm
+  "5": cm
+  "6": m
+
+precision:
+  length_m: 3
+  area_m2: 3
+  volume_m3: 3
+  weight_kg: 3
+  count: 0
+
+rounding: half_up              # half_up | half_even；算量复核默认四舍五入

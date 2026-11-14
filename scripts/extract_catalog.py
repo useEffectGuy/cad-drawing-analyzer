@@ -209,6 +209,7 @@ def extract_catalog(input_path: str) -> dict:
     out_of_catalog = [f for f in file_basenames if f not in catalog_nos]
 
     return {
+        "schema": "tzp.catalog/1.0",
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         "source": source,
         "total_sheets": len(catalog),

@@ -98,6 +98,28 @@ def load_yaml(path_or_name: str, required: bool = True) -> dict:
     return data or {}
 
 
+# ---------------------------------------------------------------- 契约配置
+def config_path(name: str) -> str:
+    """返回 config/ 下配置文件的绝对路径（唯一真相源）。"""
+    return os.path.join(ROOT_DIR, "config", f"{name}.yaml")
+
+
+def load_config(name: str, required_keys=()) -> dict:
+    """加载 config/<name>.yaml。委托 contracts 统一入口，不在本模块重复实现。"""
+    if SCRIPT_DIR not in sys.path:
+        sys.path.insert(0, SCRIPT_DIR)
+    from contracts import load_config as _load_config
+    return _load_config(name, required_keys)
+
+
+def schema_id(stage: str) -> str:
+    """返回中间产物的 schema 版本标识（如 tzp.wbs/1.0）。"""
+    if SCRIPT_DIR not in sys.path:
+        sys.path.insert(0, SCRIPT_DIR)
+    from contracts import schema_id as _schema_id
+    return _schema_id(stage)
+
+
 # ---------------------------------------------------------------- 专业词典
 class DisciplineDict:
     """专业识别词典访问器。数据唯一来源：rules/discipline_dict.yaml。"""

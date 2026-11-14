@@ -290,6 +290,7 @@ def _merge_quantities(items: list) -> dict:
         for k, v in sorted(areas.items(), key=lambda x: -x[1]) if v > 0
     ]
     return {
+        "schema": "tzp.quantities/1.0",
         "file": f"{len(items)} 张图纸",
         "block_table": block_table,
         "length_table": length_table,
@@ -440,6 +441,7 @@ def deep_space(ctx: Ctx) -> dict:
     assignment = sd.assign_components(space.get("spaces", []))
     elevation = ElevationParser(doc).parse()
     result = {
+        "schema": "tzp.space/1.0",
         "file_name": os.path.basename(dxf),
         "analyzed_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "frame": frame,

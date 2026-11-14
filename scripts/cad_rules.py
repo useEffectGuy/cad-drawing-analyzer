@@ -337,7 +337,8 @@ class RuleEngine:
             "rules_executed": len(results),
             "rules_passed": sum(1 for r in results if r["status"] == "pass"),
         }
-        return {"summary": summary, "results": results, "entity_errors": dict(entity_errors)}
+        return {"schema": "tzp.review/1.0",
+                "summary": summary, "results": results, "entity_errors": dict(entity_errors)}
 # ---------------------------------------------------------------- 报告输出
 def write_rules_md(engine_result: dict, cio: dict, out_path: str):
     L = []

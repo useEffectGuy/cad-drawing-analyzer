@@ -1,0 +1,34 @@
+# 构件扣减优先级 —— 显式配置，禁止隐式假设
+# 语义：order 中靠前的构件为“优先构件”，不会被靠后构件扣减；
+#       rules.<构件>.deduct 列出可扣减该构件的构件。
+version: "1.0"
+
+order: [基础, 柱, 梁, 墙, 板]
+
+rules:
+  基础:
+    deduct: []
+    deduct_openings: false
+  柱:
+    deduct: [基础]
+    deduct_openings: false
+  梁:
+    deduct: [基础, 柱]
+    deduct_openings: false
+  墙:
+    deduct: [基础, 柱, 梁]
+    deduct_openings: true
+  板:
+    deduct: [基础, 柱, 梁, 墙]
+    deduct_openings: true
+
+overlap:
+  beam_column: true        # 梁柱重叠体积去重
+  wall_column: true        # 墙柱重叠体积去重
+  slab_beam: true          # 板梁重叠体积去重
+  wall_slab: true
+
+opening_rule:
+  min_area_m2: 0.3         # 与 thresholds.deduction.opening_min_area_m2 保持一致
+  applies_to: [墙, 板]
+  count_as_deduction_line: true   # 是否在清单中单列“扣除洞口”

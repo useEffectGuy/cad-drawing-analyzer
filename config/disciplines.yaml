@@ -1,0 +1,84 @@
+# 专业注册表 —— 专业代码、验收体系、清单专业归属
+# 关键词词典不在此处，统一放 rules/discipline_dict.yaml，避免双真相。
+version: "1.0"
+
+dictionary: rules/discipline_dict.yaml
+default_acceptance_standard: GB50300
+
+# 关键制度约束：GB 50300 是验收划分，GB/T 50500 是清单编码，两套码并存，不得互相替代。
+# 市政、园林各自独立验收标准，禁止硬塞进房建 GB 50300 分部树。
+disciplines:
+  - code: ARCH
+    name: 建筑
+    acceptance_standard: GB50300
+    boq_profession: "01"        # 房屋建筑与装饰工程
+    measuring_units: [m2, m3, m, 樘, 个, 项]
+
+  - code: STRU
+    name: 结构
+    acceptance_standard: GB50300
+    boq_profession: "01"
+    measuring_units: [m3, m2, m, kg, t, 个]
+
+  - code: PLUMB
+    name: 给排水
+    acceptance_standard: GB50300
+    boq_profession: "03"        # 通用安装工程
+    measuring_units: [m, 个, 套, 项]
+
+  - code: HVAC
+    name: 暖通
+    acceptance_standard: GB50300
+    boq_profession: "03"
+    measuring_units: [m, 个, 套, 项]
+
+  - code: ELEC
+    name: 电气
+    acceptance_standard: GB50300
+    boq_profession: "03"
+    measuring_units: [m, 个, 套, 项]
+
+  - code: INTELL
+    name: 智能化
+    acceptance_standard: GB50300
+    boq_profession: "03"
+    measuring_units: [m, 个, 套, 项]
+
+  - code: ELEV
+    name: 电梯
+    acceptance_standard: GB50300
+    boq_profession: "03"
+    measuring_units: [台, 套, 项]
+
+  - code: ENERGY
+    name: 建筑节能
+    acceptance_standard: GB50300
+    boq_profession: "01"
+    measuring_units: [m2, m3, 个, 项]
+
+  - code: MUNI
+    name: 市政
+    acceptance_standard: MUNICIPAL
+    boq_profession: "04"        # 市政工程
+    measuring_units: [m, m2, m3, 个, 项]
+    note: 使用市政专业验收标准，套用房建 GB 50300 分部树属错误
+
+  - code: LAND
+    name: 园林
+    acceptance_standard: LANDSCAPE
+    boq_profession: "05"        # 园林绿化工程
+    measuring_units: [株, m2, m3, 个, 项]
+    note: 使用园林绿化专业验收标准，乔木灌木按株、地被草坪按面积
+
+  - code: STEEL
+    name: 钢结构
+    acceptance_standard: GB50300
+    boq_profession: "01"
+    measuring_units: [t, m2, m, 个]
+    note: 归入主体结构分部，计量以吨为主
+
+  - code: UNKNOWN
+    name: 未识别
+    acceptance_standard: OTHER
+    boq_profession: null
+    measuring_units: []

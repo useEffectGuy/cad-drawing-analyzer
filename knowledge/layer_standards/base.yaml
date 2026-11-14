@@ -1,0 +1,114 @@
+# 图层角色库 —— 图层角色唯一真相源
+# 职责：决定图元是否允许进入几何量算；不改变图元本身坐标。
+#
+# 判定顺序：
+#   1. 按 priority 顺序，用 roles.<角色>.keywords 做子串匹配，命中即返回；
+#   2. 再匹配 measurable.prefixes（子串、大小写不敏感），命中为 MEASURABLE；
+#   3. 都不命中为 UNKNOWN（不得静默丢弃，调用方必须记入 unclassified）。
+#
+# 设计说明：图层名是高置信度先验，但不是唯一真相；角色只控制“是否量算”，
+#          语义识别仍需与文字/图例/表格交叉验证。
+version: "1.0"
+
+priority: [FRAME, AXIS, ANNOTATION, FILL, AUXILIARY]
+
+roles:
+  FRAME:
+    description: 图框 / 图签 / 会签栏，永不进入量算
+    keywords: [图框, 图签, 会签, "FRAME", "TITLE", "BORDER", "TB-"]
+  AXIS:
+    description: 轴线 / 轴网，不是实体构件
+    keywords: [轴线, 轴网, "AXIS", "GRID", "DOTE"]
+  ANNOTATION:
+    description: 文字 / 尺寸标注 / 表格 / 图例，可读语义但不参与几何量算
+    keywords:
+      - 标注
+      - 尺寸
+      - 文字
+      - 注释
+      - 说明
+      - 引线
+      - 表格
+      - 表
+      - 图例
+      - "DIM"
+      - "TEXT"
+      - "NOTE"
+      - "LEADER"
+      - "SCHEDULE"
+      - "LEGEND"
+      - "TABLE"
+  FILL:
+    description: 填充 / 剖面线 / 渐变，面积易重复计算，默认排除
+    keywords: [填充, 剖面线, "HATCH", "SOLID", "GRADIENT"]
+  AUXILIARY:
+    description: 辅助线 / 构造线 / 非打印图层
+    keywords: [辅助, 构造线, 参照, "AUX", "DEFPOINTS", "CONSTRUCTION"]
+
+measurable:
+  description: 构件图层（子串匹配，大小写不敏感）
+  prefixes:
+    # 建筑
+    - A-WALL
+    - A-DOOR
+    - A-WIND
+    - A-GLAZ
+    - A-COLS
+    - A-STRS
+    - A-ROOF
+    - A-FLOR
+    - A-CLNG
+    # 结构
+    - S-COLS
+    - S-COLUMN
+    - S-BEAM
+    - S-SLAB
+    - S-FOUN
+    - S-REBAR
+    - S-WALL
+    - S-STRS
+    # 给排水 / 消防
+    - P-PIPE
+    - P-FIXT
+    - P-VALVE
+    - P-SANIT
+    - P-EQUIP
+    # 暖通
+    - H-DUCT
+    - H-PIPE
+    - M-DUCT
+    - H-EQUIP
+    # 电气
+    - E-LIGHT
+    - E-POWER
+    - E-CABLE
+    - E-SOCKET
+    - E-PANEL
+    - E-EQUIP
+    # 市政 / 园林
+    - C-ROAD
+    - C-PIPE
+    - C-DRAIN
+    - L-PLANT
+    - L-TREE
+    - L-SHRUB
+    - L-GRASS
+    - L-PAVE
+    - L-WATER
+    # 中文图层（设计院常见命名）
+    - 墙体
+    - 门窗
+    - 钢筋
+    - 管道
+    - 给水
+    - 排水
+    - 消防
+    - 暖通
+    - 风管
+    - 桥架
+    - 电缆
+    - 苗木
+    - 乔木
+    - 灌木
+    - 草坪
+    - 灯具

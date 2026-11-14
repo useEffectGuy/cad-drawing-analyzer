@@ -1,0 +1,51 @@
+# 置信度、几何容差、扣减阈值、待确认规则
+# 阈值只在此处维护；代码内出现魔法数字视为缺陷。
+version: "1.0"
+
+confidence:
+  low: 50              # 低于此值视为低置信，进入待确认
+  high: 80             # 达到此值视为可自动归集
+  accept: 60           # 单条工程量进入正式汇总的最低分（0-100）
+  direct: 100          # DXF 直读图元的固定置信度
+
+geometry:
+  snap_tolerance_mm: 50        # 端点吸附容差
+  cluster_y_tolerance_mm: 80   # 表格行聚类 / 目录行聚类
+  near_tolerance_mm: 3000      # 引线与被注对象的最大关联距离
+  zero_length_mm: 0.001        # 低于此长度视为退化图元
+  zero_area_m2: 0.000001
+  min_room_area_m2: 0.5        # 小于此面积不作为房间
+  angle_tolerance_deg: 0.5     # 平行/正交判定容差
+
+deduction:
+  opening_min_area_m2: 0.3     # 单个洞口面积超过此值才扣减（墙/板）
+  opening_min_area_m2_cut: 0.3 # 混凝土构件洞口扣减阈值
+  overlap_tolerance_m3: 0.0001 # 重叠扣减的最小可记录体积
+
+frame:
+  right_bottom_region: [0.6667, 0.6667]  # 图框检测搜索区起点比例
+  min_frame_area_m2: 0.01
+  max_frame_ratio: 0.95        # 图框面积 / 图幅面积，超出视为误检
+
+scale:
+  # 三级校准：$INSUNITS → 图签比例文字 → 图框尺寸/纸幅推断
+  paper_sizes_mm:              # ISO A 系列 [长边, 短边]，单位 mm
+    A4: [297, 210]
+    A3: [420, 297]
+    A2: [594, 420]
+    A1: [841, 594]
+    A0: [1189, 841]
+  frame_paper_tolerance: 0.05  # 图框/纸幅比与图签比例的允许偏差（相对值）
+  paper_aspect_tolerance: 0.05 # 图框长宽比与纸幅长宽比的允许偏差（相对值）
+  model_min_frame_long_mm: 2378 # 无图签比例时：图框长边 ≥ 2×A0 长边 → 判为模型空间 1:1
+
+pdf:
+  vector_text_min_chars: 20    # 一页矢量文字少于此值判为扫描页
+  scanned_page_text_max: 10
+
+pending:
+  max_untraceable_ratio: 0.0   # 正式汇总中不可追溯数值的允许比例（0 = 零容忍）
+
+limits:
+  max_entities_per_sheet: 200000
+  max_evidence_per_line: 200

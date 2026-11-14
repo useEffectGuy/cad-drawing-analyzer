@@ -1,0 +1,79 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://tuzhitong.local/schemas/drawing_index.schema.json",
+  "title": "DrawingIndex（L0 图纸索引）",
+  "description": "L0 输出：图框元数据 + 子图列表 + 比例校准结果 + 图元池位置。比例未校准的图纸 status 必须为 PENDING_SCALE。",
+  "type": "object",
+  "required": ["schema", "sheets"],
+  "additionalProperties": true,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "pattern": "^tzp\\.drawing_index/\\d+\\.\\d+$"
+    },
+    "generated_at": { "type": "string" },
+    "source_file": { "type": "string" },
+    "units": {
+      "type": "object",
+      "required": ["drawing_unit"],
+      "additionalProperties": true,
+      "properties": {
+        "drawing_unit": {
+          "type": "string",
+          "enum": ["mm", "cm", "m", "inch", "ft", "unitless"]
+        },
+        "factor_to_mm": { "type": "number", "exclusiveMinimum": 0 },
+        "calibrated_by": {
+          "type": "string",
+          "enum": ["INSUNITS", "TITLE_BLOCK", "PDF_MEASURE", "ASSUMED"],
+          "description": "ASSUMED 视为未校准，必须进待确认"
+        },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "entity_pool": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "path": { "type": "string" },
+        "entity_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "sheets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["sheet_id", "frame_bbox", "status"],
+        "additionalProperties": true,
+        "properties": {
+          "sheet_id": { "type": "string" },
+          "drawing_no": { "type": ["string", "null"] },
+          "drawing_name": { "type": ["string", "null"] },
+          "discipline": { "type": ["string", "null"] },
+          "scale_text": { "type": ["string", "null"], "description": "图签原文，如 1:100" },
+          "scale_ratio": { "type": ["number", "null"], "description": "图形单位/实际单位的比值，1:100 → 100" },
+          "frame_bbox": {
+            "type": "array",
+            "items": { "type": "number" },
+            "minItems": 4,
+            "maxItems": 4
+          },
+          "view_types": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["PLAN", "ELEVATION", "SECTION", "DETAIL", "SCHEDULE", "LEGEND", "NOTES", "SITE_PLAN", "UNKNOWN"]
+            }
+          },
+          "version": { "type": ["string", "null"], "description": "图签版本/日期，用于升版比对" },
+          "entity_count": { "type": "integer", "minimum": 0 },
+          "status": {
+            "type": "string",
+            "enum": ["OK", "PENDING_SCALE", "PENDING_FRAME"],
+            "description": "非 OK 状态不得进入正式工程量汇总"
+          }
+        }
+      }
+    }
+  }
+}

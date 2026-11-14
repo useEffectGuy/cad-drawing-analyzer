@@ -111,6 +111,7 @@ class MaterialExtractor:
         # 去重后的总命中数（同一实体同一匹配文本只算一次）
         uniq_total = sum(info["count"] for info in summary.values())
         return {
+            "schema": "tzp.material/1.0",
             "dict_version": self.version,
             "total_hits": uniq_total,
             "raw_hits": len(hits),
