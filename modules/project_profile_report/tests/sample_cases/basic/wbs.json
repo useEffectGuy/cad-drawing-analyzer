@@ -1,0 +1,8 @@
+{
+  "schema": "tzp.wbs/1.0",
+  "division_count": 2,
+  "divisions": {
+    "地基与基础": {"土方": {"土方开挖": [{"name": "土方开挖", "quantity": 1}]}},
+    "主体结构": {"混凝土": {"矩形柱": [{"name": "矩形柱", "quantity": 24}]}}
+  }
+}

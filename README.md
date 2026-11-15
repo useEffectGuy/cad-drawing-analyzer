@@ -10,7 +10,7 @@
 - **规则数据外置**：新增 `rules/discipline_dict.yaml`（专业词典唯一来源）与 `rules/gb50300_map.yaml`（WBS 映射唯一来源），代码只查表，不再与文档双源漂移。
 - **PDF 矢量几何量算**：新增 `measure_pdf.py`，统计线条长度、矩形面积与图元数量，产物 `pdf_quantities.json`；`parse_tables.py --geometry` 可一并产出，且 `tables.json` 既有结构不变。
 - **专业覆盖补齐**：新增智能建筑、建筑节能、电梯、消防 4 篇专业指引，以及消防专项规则库 `rules/fire_rules.yaml`（6 条规则）。
-- **冒烟测试**：`tests/smoke_test.py`（20 条端到端断言）与测试用 DXF 生成器，`python tests/smoke_test.py` 即可运行，无需 pytest。
+- **冒烟测试**：`tests/smoke_test.py`（26 条端到端断言）与测试用 DXF 生成器，`python tests/smoke_test.py` 即可运行，无需 pytest。
 ## 系统架构
 ```
 DXF 图纸
@@ -49,6 +49,10 @@ DXF 图纸
 | `cad_graph.py` | 知识图谱构建 + 多跳推理问答 |
 | `cad_render.py` | 图纸渲染预览 |
 | `cad_convert.py` | DWG 自动转换（探测 ODA/LibreDWG 并自动调用） |
+### 可选模块（可插拔，默认开关控制）
+| 模块 | 能力 |
+|---|---|
+| `modules/project_profile_report/` | PPR 项目概况与报告生成：从图签/总说明抽取概况（带来源与置信度），组装含概况、工程量、缺项、附录的完整报告；只读复用现有产物，不重算工程量 |
 ### 识别引擎
 | 模块 | 能力 |
 |---|---|
@@ -179,8 +183,16 @@ cad-drawing-analyzer/
 │   ├── quantity-rules.md / gb50300-division.md / reporting.md
 │   ├── dxf_entities.md / analysis_dimensions.md
 │   └── disciplines/              # 9 个专业指引（含智能建筑/节能/电梯/消防）
+├── modules/
+│   └── project_profile_report/   # PPR 可插拔模块：项目概况抽取 + 报告组装
+│       ├── README.md             # 模块定位、接口、开关与验收
+│       ├── config/               # module / 通用字段 / 专业字段 / 报告章节
+│       ├── prompts/              # 提示词增量（概况抽取、报告组装）
+│       ├── src/                  # profile_extractor / missing_item_checker / report_assembler
+│       ├── templates/            # report_template.md
+│       └── tests/sample_cases/   # 示例用例（catalog / quantities / wbs / texts）
 └── tests/
-    ├── smoke_test.py             # 23 条端到端冒烟断言
+    ├── smoke_test.py             # 26 条端到端冒烟断言
     └── fixtures/
         ├── make_mini_dxf.py      # 基础测试 DXF 生成器
         ├── make_quantity_dxf.py  # 工程量测试图生成器（1:100 图框/墙/门窗/梁筋/苗木）
@@ -202,5 +214,5 @@ cad-drawing-analyzer/
 - ✅ 识别 6 樘窗、4 樘门，提取门编号和宽度
 ### 回归验证
 - 13 项端到端测试全部通过 ✅
-- `python tests/smoke_test.py -v`：23 条冒烟断言全部通过 ✅（清点 / 转换探测 / 目录 / 专业 / 算量 / WBS / Excel / 流水线 / 深链 / resume / quiet / PDF 量算 / YAML 缺失 / 文档一致性 / 工程量金标准 / 契约自检 / 版本戳 / 配置语义 / 契约校验 / 面积引擎 / 比例校准 / 图层角色 / 未识别图层）
+- `python tests/smoke_test.py -v`：26 条冒烟断言全部通过 ✅（清点 / 转换探测 / 目录 / 专业 / 算量 / WBS / Excel / 流水线 / 深链 / resume / quiet / PDF 量算 / YAML 缺失 / 文档一致性 / 工程量金标准 / 契约自检 / 版本戳 / 配置语义 / 契约校验 / 面积引擎 / 比例校准 / 图层角色 / 未识别图层 / 概况抽取 / 报告打包 / 模块开关）
 - `python scripts/contracts.py --check`：7 份 Schema + 4 份配置全量自检通过 ✅

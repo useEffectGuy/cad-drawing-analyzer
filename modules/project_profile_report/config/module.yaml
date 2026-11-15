@@ -1,0 +1,28 @@
+# PPR 模块开关与输出约定
+# 关闭 enable_project_profile_report 时，本模块不产生任何文件，现有 Skill 输出完全不变。
+version: "1.0"
+module_name: project_profile_report
+enable_project_profile_report: true
+
+output_dir_name: report_bundle
+report_filename: project_report.md
+profile_filename: project_profile.json
+missing_filename: missing_items.json
+quantities_appendix_filename: engineering_quantities.csv
+manifest_filename: bundle_manifest.json
+
+# 低于该置信度的字段在报告中标记“需复核”，并进入 missing_items 的低置信度清单
+min_confidence_for_report: 0.6
+
+disclaimer: >-
+  本报告基于图纸自动识别与现有工程量提取结果生成，仅用于设计/造价复核辅助，
+  不替代正式预算、结算、审图结论及注册执业人员签章文件。
+
+# 不同来源的置信度（覆盖 profile_fields_common.yaml 的同名配置）
+source_confidence:
+  DERIVED: 0.95
+  TITLE_BLOCK: 0.9
+  TEXT: 0.85
+  CATALOG: 0.8
+  CIO_TEXT: 0.75
+  UNKNOWN: 0.5

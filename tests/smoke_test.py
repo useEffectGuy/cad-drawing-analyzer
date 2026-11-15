@@ -25,7 +25,11 @@ import yaml
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 SCRIPTS = os.path.join(ROOT, "scripts")
+PACKAGE_MODULES = os.path.join(ROOT, "modules", "project_profile_report")
+MODULE_SRC = os.path.join(PACKAGE_MODULES, "src")
+PACKAGE_SAMPLE = os.path.join(PACKAGE_MODULES, "tests", "sample_cases", "basic")
 sys.path.insert(0, SCRIPTS)
+sys.path.insert(0, MODULE_SRC)
 sys.path.insert(0, os.path.join(HERE, "fixtures"))
 
 from make_mini_dxf import build  # noqa: E402
@@ -418,6 +422,103 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(data["unclassified"]["entity_count"], 1)
         self.assertIn("MYSTERY-LAYER", data["unclassified"]["layers"])
         self.assertTrue(data["pending"])
+
+
+    # ---- PPR 模块追加 3 条 ----
+
+    def test_24_project_profile_extraction(self):
+        """概况抽取：字段带 value/source/confidence，缺失为 null，未知来源低置信度"""
+        from missing_item_checker import check_missing_items
+        from profile_extractor import extract_project_profile
+
+        profile = extract_project_profile(PACKAGE_SAMPLE)
+        self.assertEqual(profile["schema"], "tzp.project_profile/1.0")
+        self.assertTrue(profile["module"]["enabled"])
+
+        common = profile["common"]
+        self.assertEqual(common["project_name"]["value"], "滨河路综合楼建设工程")
+        self.assertEqual(common["project_name"]["source"]["type"], "TITLE_BLOCK")
+        self.assertAlmostEqual(common["project_name"]["confidence"], 0.9)
+        self.assertEqual(common["design_stage"]["value"], "施工图设计")
+        self.assertEqual(common["drawing_count"]["value"], "6 张")
+        self.assertEqual(common["discipline_scope"]["value"], "建筑、结构、给排水、电气")
+        self.assertIsNone(common["supervisor"]["value"])
+        self.assertAlmostEqual(common["contract_amount"]["confidence"], 0.5)
+
+        codes = [d["code"] for d in profile["detected_disciplines"]]
+        self.assertEqual(codes, ["ARCH", "STRU", "PLUMB", "ELEC"])
+        self.assertIn("arch_floor_count", profile["by_discipline"]["ARCH"]["fields"])
+        self.assertEqual(
+            profile["by_discipline"]["STRU"]["fields"]["stru_seismic"]["value"], "7 度")
+
+        missing = check_missing_items(profile)
+        self.assertEqual(missing["schema"], "tzp.missing_items/1.0")
+        by_id = {item["field_id"]: item for item in missing["items"]}
+        self.assertEqual(by_id["supervisor"]["status"], "MISSING")
+        self.assertTrue(by_id["supervisor"]["needs_review"])
+        self.assertEqual(by_id["contract_amount"]["status"], "LOW_CONFIDENCE")
+        low_ids = [i["field_id"] for i in missing["items"]
+                   if i["status"] == "LOW_CONFIDENCE"]
+        self.assertEqual(low_ids, ["contract_amount"])
+
+    def test_25_report_bundle(self):
+        """报告组装：报告包文件齐全、章节与免责声明完整、原工程量未被修改"""
+        from profile_extractor import extract_project_profile, load_work_sources
+        from report_assembler import assemble_project_report
+
+        quantities_path = os.path.join(PACKAGE_SAMPLE, "quantities.json")
+        with open(quantities_path, "rb") as f:
+            before = f.read()
+
+        sources = load_work_sources(PACKAGE_SAMPLE)
+        profile = extract_project_profile(sources)
+        out_dir = os.path.join(self.tmp, "report_bundle")
+        result = assemble_project_report(profile, sources, out_dir=out_dir)
+
+        self.assertTrue(result["enabled"])
+        names = sorted(os.path.basename(p) for p in result["files"])
+        self.assertEqual(names, sorted([
+            "project_report.md", "project_profile.json", "missing_items.json",
+            "engineering_quantities.csv", "bundle_manifest.json"]))
+
+        report_path = os.path.join(out_dir, "project_report.md")
+        with open(report_path, "r", encoding="utf-8") as f:
+            report = f.read()
+        for keyword in ("报告摘要", "项目概况", "编制依据与图纸识别说明",
+                        "工程量汇总与明细", "主要材料设备汇总",
+                        "指标分析与异常提示", "缺项与复核清单", "附录",
+                        "不替代正式预算", "需复核"):
+            self.assertIn(keyword, report)
+
+        with open(os.path.join(out_dir, "engineering_quantities.csv"),
+                  "r", encoding="utf-8-sig") as f:
+            self.assertTrue(f.readline().startswith("类别,名称,规格,数量,单位,来源"))
+
+        manifest = load(os.path.join(out_dir, "bundle_manifest.json"))
+        self.assertEqual(manifest["schema"], "tzp.report_bundle/1.0")
+        self.assertEqual(len(manifest["files"]), 4)
+
+        with open(quantities_path, "rb") as f:
+            self.assertEqual(before, f.read(), "PPR 不得修改原有工程量结果")
+
+    def test_26_project_profile_module_switch(self):
+        """模块开关关闭：返回 enabled=False 且不创建任何文件"""
+        from profile_extractor import extract_project_profile
+        from report_assembler import assemble_project_report
+
+        profile = extract_project_profile(PACKAGE_SAMPLE)
+        out_dir = os.path.join(self.tmp, "disabled_bundle")
+        result = assemble_project_report(
+            profile, {"work_dir": PACKAGE_SAMPLE}, out_dir=out_dir,
+            config={"enable_project_profile_report": False})
+        self.assertFalse(result["enabled"])
+        self.assertEqual(result["files"], [])
+        self.assertFalse(os.path.exists(out_dir))
+
+        off_profile = extract_project_profile(
+            PACKAGE_SAMPLE, config={"enable_project_profile_report": False})
+        self.assertFalse(off_profile["module"]["enabled"])
+        self.assertEqual(off_profile["common"], {})
 
 
 if __name__ == "__main__":

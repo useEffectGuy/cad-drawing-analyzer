@@ -1,0 +1,151 @@
+# 十大专业扩展概况字段
+# key 必须与 config/disciplines.yaml 的 code 一致；未识别专业只输出通用概况。
+# 字段检索机制与 profile_fields_common.yaml 相同（aliases / value_pattern）。
+version: "1.0"
+
+disciplines:
+  ARCH:
+    name: 建筑
+    fields:
+      - id: arch_floor_count
+        name: 层数
+        aliases: [层数, 建筑层数, 地上层数, 地下层数]
+      - id: arch_height
+        name: 建筑高度
+        aliases: [建筑高度, 檐口高度, 建筑总高度]
+      - id: arch_structure_type
+        name: 结构类型
+        aliases: [结构类型, 结构形式]
+      - id: arch_fire_rating
+        name: 耐火等级
+        aliases: [耐火等级, 建筑耐火等级]
+      - id: arch_land_area
+        name: 用地面积
+        aliases: [用地面积, 总用地面积, 规划用地面积]
+
+  STRU:
+    name: 结构
+    fields:
+      - id: stru_system
+        name: 结构体系
+        aliases: [结构体系, 结构形式, 结构类型]
+      - id: stru_seismic
+        name: 抗震设防烈度
+        aliases: [抗震设防烈度, 设防烈度, 抗震烈度]
+      - id: stru_foundation
+        name: 基础形式
+        aliases: [基础形式, 基础类型, 基础方案]
+      - id: stru_concrete_grade
+        name: 混凝土强度等级
+        aliases: [混凝土强度等级, 砼强度等级]
+      - id: stru_steel_grade
+        name: 钢筋牌号
+        aliases: [钢筋牌号, 钢筋级别, 钢筋种类]
+
+  PLUMB:
+    name: 给排水
+    fields:
+      - id: plumb_water_supply
+        name: 给水方式
+        aliases: [给水方式, 供水方式]
+      - id: plumb_drainage
+        name: 排水体制
+        aliases: [排水体制, 排水方式]
+      - id: plumb_fire
+        name: 消防系统
+        aliases: [消防系统, 消火栓系统, 自动喷水灭火系统]
+
+  HVAC:
+    name: 暖通
+    fields:
+      - id: hvac_ac
+        name: 空调形式
+        aliases: [空调形式, 空调系统, 空调方式]
+      - id: hvac_vent
+        name: 通风方式
+        aliases: [通风方式, 通风系统]
+      - id: hvac_heat
+        name: 供暖方式
+        aliases: [供暖方式, 采暖方式]
+
+  ELEC:
+    name: 电气
+    fields:
+      - id: elec_source
+        name: 供电电源
+        aliases: [供电电源, 电源引入, 供电方式]
+      - id: elec_capacity
+        name: 变配电容量
+        aliases: [变配电容量, 变压器容量, 装机容量]
+      - id: elec_lightning
+        name: 防雷等级
+        aliases: [防雷等级, 建筑物防雷类别, 防雷类别]
+
+  INTELL:
+    name: 智能化
+    fields:
+      - id: intell_systems
+        name: 智能化系统
+        aliases: [智能化系统, 弱电系统]
+      - id: intell_network
+        name: 网络与布线
+        aliases: [综合布线, 网络系统]
+
+  ELEV:
+    name: 电梯
+    fields:
+      - id: elev_count
+        name: 电梯数量
+        aliases: [电梯数量, 电梯台数]
+      - id: elev_load
+        name: 电梯载重
+        aliases: [电梯载重, 额定载重]
+
+  ENERGY:
+    name: 建筑节能
+    fields:
+      - id: energy_standard
+        name: 节能标准
+        aliases: [节能标准, 节能设计标准]
+      - id: energy_insulation
+        name: 保温做法
+        aliases: [保温做法, 外墙保温, 屋面保温]
+
+  MUNI:
+    name: 市政
+    fields:
+      - id: muni_road_grade
+        name: 道路等级
+        aliases: [道路等级, 公路等级]
+      - id: muni_road_length
+        name: 道路长度
+        aliases: [道路长度, 路线长度]
+      - id: muni_drainage
+        name: 排水体制
+        aliases: [排水体制, 排水方式]
+
+  LAND:
+    name: 园林
+    fields:
+      - id: land_green_area
+        name: 绿化面积
+        aliases: [绿化面积, 绿地面积]
+      - id: land_plant_spec
+        name: 苗木规格
+        aliases: [苗木规格, 乔木规格]
+      - id: land_density
+        name: 种植密度
+        aliases: [种植密度, 栽植密度]
+
+  STEEL:
+    name: 钢结构
+    fields:
+      - id: steel_system
+        name: 钢结构形式
+        aliases: [钢结构形式, 结构体系]
+      - id: steel_grade
+        name: 钢材牌号
+        aliases: [钢材牌号, 钢材材质]
+      - id: steel_weight
+        name: 用钢量
+        aliases: [用钢量, 钢材用量]

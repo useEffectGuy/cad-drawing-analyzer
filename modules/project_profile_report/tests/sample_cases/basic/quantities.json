@@ -1,0 +1,20 @@
+{
+  "schema": "tzp.quantities/1.0",
+  "file": "sample_case",
+  "scale": {"status": "OK", "geometry_state": "MODEL_1_TO_1", "factor_to_mm": 1.0},
+  "layer_roles": {"A-WALL": "MEASURABLE", "S-COLUMN": "MEASURABLE", "P-PIPE": "MEASURABLE"},
+  "block_table": [
+    {"block_name": "矩形柱", "quantity": 24, "unit": "个", "layers": {"S-COLUMN": 24}, "specs": {"500×500": 24}},
+    {"block_name": "门", "quantity": 36, "unit": "樘", "layers": {"A-DOOR": 36}, "specs": {"M1021": 36}}
+  ],
+  "length_table": [
+    {"layer": "P-PIPE", "total_length_mm": 128000.0, "total_length_m": 128.0, "unit": "m"}
+  ],
+  "area_table": [
+    {"layer": "A-WALL", "total_area_mm2": 42000000.0, "total_area_m2": 42.0, "unit": "m²"}
+  ],
+  "excluded": {},
+  "unclassified": {"layers": [], "entity_count": 0},
+  "pending": [],
+  "summary": {"block_types": 2, "block_total": 60, "length_layers": 1, "area_layers": 1}
+}

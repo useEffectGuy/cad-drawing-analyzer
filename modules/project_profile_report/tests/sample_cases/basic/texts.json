@@ -1,0 +1,16 @@
+{
+  "texts": [
+    {"text": "工程名称：滨河路综合楼建设工程", "source": {"type": "TITLE_BLOCK", "ref": "建施-01"}},
+    {"text": "建设地点：XX市滨河区滨河路 18 号", "source": {"type": "TITLE_BLOCK", "ref": "建施-01"}},
+    {"text": "建设单位：XX市城建投资有限公司", "source": {"type": "TEXT", "ref": "建筑设计总说明"}},
+    {"text": "设计单位：XX建筑设计研究院", "source": {"type": "TEXT", "ref": "建筑设计总说明"}},
+    {"text": "工程类别：房屋建筑工程", "source": {"type": "TEXT", "ref": "建筑设计总说明"}},
+    {"text": "设计阶段：施工图设计", "source": {"type": "TEXT", "ref": "建筑设计总说明"}},
+    {"text": "建筑面积：12000 m2", "source": {"type": "TEXT", "ref": "建筑设计总说明"}},
+    {"text": "层数：地上 6 层，地下 1 层", "source": {"type": "TEXT", "ref": "建筑设计总说明"}},
+    {"text": "结构类型：框架结构", "source": {"type": "TEXT", "ref": "结构设计总说明"}},
+    {"text": "抗震设防烈度：7 度", "source": {"type": "TEXT", "ref": "结构设计总说明"}},
+    {"text": "编制依据：GB 50300-2013、GB/T 50500-2013", "source": {"type": "TEXT", "ref": "建筑设计总说明"}},
+    {"text": "合同价：8600 万元", "source": {"type": "UNKNOWN", "ref": "未标注来源"}}
+  ]
+}

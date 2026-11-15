@@ -1,0 +1,28 @@
+# 报告章节配置：按顺序输出；enabled=false 的章节整节跳过
+version: "1.0"
+
+sections:
+  - id: summary
+    title: 报告摘要
+    enabled: true
+  - id: profile
+    title: 项目概况
+    enabled: true
+  - id: basis
+    title: 编制依据与图纸识别说明
+    enabled: true
+  - id: quantities
+    title: 工程量汇总与明细
+    enabled: true
+  - id: materials
+    title: 主要材料设备汇总
+    enabled: true
+  - id: indicators
+    title: 指标分析与异常提示
+    enabled: true
+  - id: missing
+    title: 缺项与复核清单
+    enabled: true
+  - id: appendix
+    title: 附录
+    enabled: true

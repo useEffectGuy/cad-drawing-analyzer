@@ -57,6 +57,17 @@ description: 图智通：DXF/DWG/PDF 图纸识别、目录与专业判定、工�
 
 DWG 无转换器时 `cad_convert --detect` 会打印安装指引，不硬解析 DWG 二进制。
 
+### 2.3 可选模块：PPR 项目概况与报告
+
+| 场景 | 命令 | 产出 |
+|---|---|---|
+| 抽项目概况 | `python modules/project_profile_report/src/profile_extractor.py work --out work/project_profile.json` | 概况 JSON（字段带 value/source/confidence） |
+| 缺项检查 | `python modules/project_profile_report/src/missing_item_checker.py work/project_profile.json --out work/missing_items.json` | 缺项与低置信度清单 |
+| 一键报告包 | `python modules/project_profile_report/src/report_assembler.py work --out work/report_bundle` | `project_report.md`、概况 JSON、缺项清单、工程量 CSV、manifest |
+
+该模块只读复用现有产物，不改工程量算法。开关位于 `modules/project_profile_report/config/module.yaml`
+的 `enable_project_profile_report`；关闭时不产生任何文件，主链路输出完全不变。
+
 ## 三、中间产物目录（每次任务在 workspace 生成）
 
 ```text
@@ -114,6 +125,7 @@ GB 50300-2013 附录 B 十大分部为主线。映射数据在 `rules/gb50300_ma
 | `config/thresholds.yaml` | 改置信度、几何容差、洞口扣减阈值、待确认规则 |
 | `config/deduction_priority.yaml` | 改构件扣减优先级（按地区/合同切换） |
 | `config/disciplines.yaml` | 改专业注册、验收体系与清单专业归属 |
+| `modules/project_profile_report/config/*.yaml` | 改 PPR 概况字段、专业扩展字段、报告章节与模块开关 |
 | `scripts/contracts.py` | 统一加载/校验/版本戳入口；`--check` 做全量契约自检 |
 | `knowledge/layer_standards/base.yaml` | 改图层角色判定（MEASURABLE/FRAME/ANNOTATION…） |
 | `rules/discipline_dict.yaml` | 改专业词典与图层关键词 |

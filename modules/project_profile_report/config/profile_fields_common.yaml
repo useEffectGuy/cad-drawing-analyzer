@@ -1,0 +1,73 @@
+# 通用项目概况字段
+# 约定：
+# - aliases 用于在“标签：值”形式的文本行中检索，按声明顺序优先；
+# - value_pattern 用于无标签但可确定值域的场景；
+# - 缺失一律 null，进入缺项清单，禁止臆造；
+# - required 仅影响缺项严重级别（high/medium），所有缺失字段都会进清单。
+version: "1.0"
+
+fields:
+  - id: project_name
+    name: 项目名称
+    required: true
+    aliases: [项目名称, 工程名称, 建设项目名称, 项目名]
+
+  - id: project_location
+    name: 建设地点
+    required: true
+    aliases: [建设地点, 工程地点, 项目地点, 建设地址]
+
+  - id: client
+    name: 建设单位
+    aliases: [建设单位, 业主单位, 发包人, 项目法人]
+
+  - id: designer
+    name: 设计单位
+    aliases: [设计单位, 设计院, 勘察设计单位]
+
+  - id: contractor
+    name: 施工单位
+    aliases: [施工单位, 承包人, 承建单位]
+
+  - id: supervisor
+    name: 监理单位
+    aliases: [监理单位, 监理公司]
+
+  - id: project_category
+    name: 工程类别
+    required: true
+    aliases: [工程类别, 工程类型, 项目类别, 建设性质]
+
+  - id: design_stage
+    name: 设计阶段
+    aliases: [设计阶段, 图纸阶段]
+    value_pattern: "(施工图设计|施工图|初步设计|方案设计|竣工图)"
+
+  - id: drawing_version
+    name: 图纸版本
+    aliases: [图纸版本, 版本, 版次, 修订版本]
+
+  - id: construction_scale
+    name: 建设规模
+    required: true
+    aliases: [建设规模, 工程规模, 总建筑面积, 建筑面积]
+
+  - id: contract_amount
+    name: 合同价/概算
+    aliases: [合同价, 合同金额, 概算, 工程造价, 投资估算]
+
+  - id: duration
+    name: 工期
+    aliases: [工期, 计划工期, 施工工期]
+
+  - id: discipline_scope
+    name: 专业范围
+    derive: disciplines
+
+  - id: basis
+    name: 编制依据
+    aliases: [编制依据, 设计依据, 主要依据]
+
+  - id: drawing_count
+    name: 图纸张数
+    derive: catalog.total_sheets
