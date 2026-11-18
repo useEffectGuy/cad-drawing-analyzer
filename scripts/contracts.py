@@ -44,6 +44,7 @@ INTERMEDIATE = {
     "catalog": "tzp.catalog/1.0",
     "quantities": "tzp.quantities/1.0",
     "wbs": "tzp.wbs/1.0",
+    "label_chains": "tzp.label_chains/1.0",
     "space": "tzp.space/1.0",
     "process": "tzp.process/1.0",
     "material": "tzp.material/1.0",

@@ -521,5 +521,36 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(off_profile["common"], {})
 
 
+    def test_27_label_chain(self):
+        """L2 标签链：每条链通过契约校验、带证据与置信度，且不改写 WBS/工程量"""
+        from contracts import validate
+
+        with open(self.quantity_json, "rb") as f:
+            quantities_before = f.read()
+        with open(self.wbs_json, "rb") as f:
+            wbs_before = f.read()
+
+        out = os.path.join(self.work, "label_chains.json")
+        self._ok("build_label_chain.py", self.work, "--out", out)
+        data = load(out)
+
+        self.assertEqual(data["schema"], "tzp.label_chains/1.0")
+        self.assertGreater(data["total"], 0)
+        self.assertEqual(data["total"], len(data["items"]))
+        for item in data["items"]:
+            self.assertEqual(validate(item, "label_chain"), [])
+            self.assertTrue(item["evidence"])
+            self.assertTrue(item["unit_work"]["name"])
+            self.assertGreaterEqual(item["confidence"], 0)
+            self.assertLessEqual(item["confidence"], 1)
+            if item["discipline"]["name"] != "未识别":
+                self.assertNotEqual(item["discipline"]["code"], "UNKNOWN")
+
+        with open(self.quantity_json, "rb") as f:
+            self.assertEqual(quantities_before, f.read(), "标签链不得改写工程量")
+        with open(self.wbs_json, "rb") as f:
+            self.assertEqual(wbs_before, f.read(), "标签链不得改写 WBS")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

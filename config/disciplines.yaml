@@ -10,54 +10,63 @@ default_acceptance_standard: GB50300
 disciplines:
   - code: ARCH
     name: 建筑
+    unit_work: 建筑与装饰工程
     acceptance_standard: GB50300
     boq_profession: "01"        # 房屋建筑与装饰工程
     measuring_units: [m2, m3, m, 樘, 个, 项]
 
   - code: STRU
     name: 结构
+    unit_work: 结构工程
     acceptance_standard: GB50300
     boq_profession: "01"
     measuring_units: [m3, m2, m, kg, t, 个]
 
   - code: PLUMB
     name: 给排水
+    unit_work: 给排水工程
     acceptance_standard: GB50300
     boq_profession: "03"        # 通用安装工程
     measuring_units: [m, 个, 套, 项]
 
   - code: HVAC
     name: 暖通
+    unit_work: 通风空调工程
     acceptance_standard: GB50300
     boq_profession: "03"
     measuring_units: [m, 个, 套, 项]
 
   - code: ELEC
     name: 电气
+    unit_work: 电气工程
     acceptance_standard: GB50300
     boq_profession: "03"
     measuring_units: [m, 个, 套, 项]
 
   - code: INTELL
     name: 智能化
+    unit_work: 智能建筑工程
     acceptance_standard: GB50300
     boq_profession: "03"
     measuring_units: [m, 个, 套, 项]
 
   - code: ELEV
     name: 电梯
+    unit_work: 电梯工程
     acceptance_standard: GB50300
     boq_profession: "03"
     measuring_units: [台, 套, 项]
 
   - code: ENERGY
     name: 建筑节能
+    unit_work: 建筑节能工程
     acceptance_standard: GB50300
     boq_profession: "01"
     measuring_units: [m2, m3, 个, 项]
 
   - code: MUNI
     name: 市政
+    unit_work: 市政工程
     acceptance_standard: MUNICIPAL
     boq_profession: "04"        # 市政工程
     measuring_units: [m, m2, m3, 个, 项]
@@ -65,6 +74,7 @@ disciplines:
 
   - code: LAND
     name: 园林
+    unit_work: 园林绿化工程
     acceptance_standard: LANDSCAPE
     boq_profession: "05"        # 园林绿化工程
     measuring_units: [株, m2, m3, 个, 项]
@@ -72,6 +82,7 @@ disciplines:
 
   - code: STEEL
     name: 钢结构
+    unit_work: 钢结构工程
     acceptance_standard: GB50300
     boq_profession: "01"
     measuring_units: [t, m2, m, 个]
@@ -79,6 +90,7 @@ disciplines:
 
   - code: UNKNOWN
     name: 未识别
+    unit_work: 未分类工程
     acceptance_standard: OTHER
     boq_profession: null
     measuring_units: []

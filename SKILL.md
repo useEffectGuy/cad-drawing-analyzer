@@ -46,6 +46,7 @@ description: 图智通：DXF/DWG/PDF 图纸识别、目录与专业判定、工�
 | 比例校准 / 图层角色 | `python scripts/unit_scale.py <图.dxf> --out work/scale.json`；`entity_pool.py <图.dxf>` |
 | PDF 表格 / 几何 | `python scripts/parse_tables.py <图.pdf> --out work/tables.json`；`measure_pdf.py <图.pdf> --out work/pdf_quantities.json` |
 | 分部分项 WBS | `python scripts/map_wbs.py work/quantities.json --catalog work/catalog_classified.json --out work/wbs.json` |
+| 语义标签链 | `python scripts/build_label_chain.py work --out work/label_chains.json` |
 | 汇总出表 | `python scripts/aggregate.py work --out work/工程量汇总统计.xlsx --report work/分析报告.md` |
 | CIO 契约 | `python scripts/cad_cio.py <图.dxf> --out work/<图名>_CIO.json --validate` |
 | 空间 / 工序 / 材料 / 审图 | `cad_space.py`、`cad_process.py`、`cad_material.py`、`cad_rules.py`（入参均为 `<图名>_CIO.json --out work`） |
@@ -75,6 +76,7 @@ work/
 ├── inventory.json / catalog.json / catalog_classified.json
 ├── normalized/*.dxf
 ├── quantities.json / tables.json / pdf_quantities.json / wbs.json
+├── label_chains.json                 # L2 四级标签链（可选，build_label_chain.py 生成）
 ├── <图名>_CIO.json、_空间识别数据.json、_工序识别数据.json、_材料识别数据.json、_审图结果.json
 ├── 工程量汇总统计.xlsx / 分析报告.md
 ├── summary.json              # 阶段状态 + 计数 + 交付物清单
