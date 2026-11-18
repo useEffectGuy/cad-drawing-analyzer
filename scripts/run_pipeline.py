@@ -7,7 +7,7 @@
            [--profile standard|deep|all]      # 默认 standard
            [--resume] [--force]               # 断点续跑 / 强制重算
            [--only catalog,wbs] [--skip tables]
-           [--snap 50] [--pdf-scale 100] [--quiet | --verbose]
+           [--with-report] [--snap 50] [--pdf-scale 100] [--quiet | --verbose]
 功能:
     1. standard：输入清点 → 格式归一 → 图纸目录 → 专业分类 → 工程量 → 表格 → WBS → 汇总
     2. deep    ：输入清点 → 格式归一 → 体检 → CIO → 空间 → 工序 → 材料 → 审图
@@ -388,6 +388,35 @@ def stage_aggregate(ctx: Ctx) -> dict:
     return _result("ok", excel, "Excel + Markdown", outputs=[excel, report])
 
 
+def assemble_report_bundle(work: str) -> dict:
+    """调用 PPR 模块组装报告包；关闭/失败均显式返回状态，不静默。"""
+    module_src = os.path.join(ROOT_DIR, "modules", "project_profile_report", "src")
+    if module_src not in sys.path:
+        sys.path.insert(0, module_src)
+    try:
+        from profile_extractor import (
+            extract_project_profile, is_enabled, load_module_config, load_work_sources)
+        from report_assembler import assemble_project_report
+
+        cfg = load_module_config()
+        if not is_enabled(cfg):
+            return {"status": "skipped",
+                    "reason": "PPR 模块已关闭（enable_project_profile_report: false）"}
+        sources = load_work_sources(work)
+        profile = extract_project_profile(sources, config=cfg)
+        res = assemble_project_report(profile, sources, config=cfg)
+        if not res.get("enabled"):
+            return {"status": "skipped", "reason": "PPR 模块未启用"}
+        return {
+            "status": "ok",
+            "out_dir": res["out_dir"],
+            "report_status": res.get("report_status", ""),
+            "files": [os.path.basename(p) for p in res.get("files", [])],
+        }
+    except Exception as e:
+        return {"status": "failed", "error": _warn(e)}
+
+
 # ---------------------------------------------------------------- deep 链
 def _require_dxf(ctx: Ctx) -> str:
     dxf = ctx.primary_dxf()
@@ -606,6 +635,7 @@ def run_pipeline(input_path: str, work: str, profile: str = "standard",
                  only=None, skip=None, snap: float = 50.0,
                  pdf_scale: float = 1.0, dpi: int = 200,
                  tolerance: int = 3000, isolation: bool = False,
+                 with_report: bool = False,
                  out: Out = None) -> dict:
     out = out or Out()
     if not os.path.exists(input_path):
@@ -663,11 +693,29 @@ def run_pipeline(input_path: str, work: str, profile: str = "standard",
         if os.path.isfile(p):
             deliverables[key] = p
 
+    # ---- L4 报告交付闭环（可选，默认不调用 PPR）
+    report_bundle = None
+    if with_report:
+        report_bundle = assemble_report_bundle(work)
+        if report_bundle.get("status") == "ok":
+            deliverables["report_bundle"] = report_bundle["out_dir"]
+
     warnings = []
     for sid, res in stage_results.items():
         for w in res.get("warnings", []):
             if len(warnings) < MAX_WARNINGS:
                 warnings.append(_warn(w))
+    if report_bundle:
+        if report_bundle["status"] == "failed":
+            failed.append("report")
+            if len(warnings) < MAX_WARNINGS:
+                warnings.append(_warn(f"报告包组装失败: {report_bundle.get('error', '')}"))
+        elif not out.quiet:
+            if report_bundle["status"] == "ok":
+                print(f"[REPORT] {report_bundle['out_dir']}  "
+                      f"{report_bundle.get('report_status', '')}")
+            else:
+                print(f"[--] report     跳过：{report_bundle.get('reason', '')}")
     deep_ids = {s for s in DEEP_STAGES if s not in ("inventory", "normalize")}
     n_dxf = len(ctx.dxf_files())
     if n_dxf > 1 and any(s in order for s in deep_ids) and len(warnings) < MAX_WARNINGS:
@@ -694,6 +742,8 @@ def run_pipeline(input_path: str, work: str, profile: str = "standard",
         "failed": failed,
         "warnings": warnings,
     }
+    if with_report:
+        summary["report_bundle"] = report_bundle
     summary_path = os.path.join(work, "summary.json")
     _dump_json(_truncate_summary(summary), summary_path)
 
@@ -799,6 +849,8 @@ def main(argv=None):
     ap.add_argument("--dpi", type=int, default=200, help="PDF 渲染 DPI（扫描兜底时使用）")
     ap.add_argument("--tolerance", type=int, default=3000, help="空间识别端点吸附容差（兼容别名）")
     ap.add_argument("--isolation", action="store_true", help="deep 链用 subprocess 隔离模式（默认函数直调）")
+    ap.add_argument("--with-report", action="store_true",
+                    help="流水线结束后调用 PPR 组装报告包（默认关闭，不产生额外文件）")
     add_output_args(ap)
     args = ap.parse_args(argv)
     out = Out.from_args(args)
@@ -811,6 +863,7 @@ def main(argv=None):
             skip=args.skip.split(",") if args.skip else None,
             snap=args.snap, pdf_scale=args.pdf_scale,
             dpi=args.dpi, tolerance=args.tolerance, isolation=args.isolation,
+            with_report=args.with_report,
             out=out,
         )
     except Fatal as e:

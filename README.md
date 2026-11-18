@@ -10,7 +10,14 @@
 - **规则数据外置**：新增 `rules/discipline_dict.yaml`（专业词典唯一来源）与 `rules/gb50300_map.yaml`（WBS 映射唯一来源），代码只查表，不再与文档双源漂移。
 - **PDF 矢量几何量算**：新增 `measure_pdf.py`，统计线条长度、矩形面积与图元数量，产物 `pdf_quantities.json`；`parse_tables.py --geometry` 可一并产出，且 `tables.json` 既有结构不变。
 - **专业覆盖补齐**：新增智能建筑、建筑节能、电梯、消防 4 篇专业指引，以及消防专项规则库 `rules/fire_rules.yaml`（6 条规则）。
-- **冒烟测试**：`tests/smoke_test.py`（27 条端到端断言）与测试用 DXF 生成器，`python tests/smoke_test.py` 即可运行，无需 pytest。
+- **冒烟测试**：`tests/smoke_test.py`（29 条端到端断言）与测试用 DXF 生成器，`python tests/smoke_test.py` 即可运行，无需 pytest。
+## Phase 4：L4 报告交付闭环（范围与验收）
+- **范围**：`scripts/run_pipeline.py` 新增可选 `--with-report`；流水线结束后调用 PPR `report_assembler`，报告包写入 `<work>/report_bundle/`，并在 `summary.json` 的 `deliverables.report_bundle` 与 `report_bundle` 字段登记。
+- **默认不变**：不带 `--with-report` 时不调用 PPR、不产生任何新文件，既有交付物与流水线行为完全不变。
+- **开关优先**：`modules/project_profile_report/config/module.yaml` 的 `enable_project_profile_report: false` 时跳过组装，`summary.json` 记录跳过原因，不报错。
+- **失败不静默**：报告组装异常写入 `summary.warnings`，`report_bundle.status=failed`，并计入 `failed`（退出码 1）。
+- **约束**：不新增全局配置、不引入 docx/pdf 新依赖、不改工程量算法。
+- **验收**：新增 2 条冒烟断言（带 flag 生成 5 件报告包并登记；不带 flag 无报告包且既有交付物不变）；全量冒烟与 `python scripts/contracts.py --check` 通过。
 ## 系统架构
 ```
 DXF 图纸
@@ -81,6 +88,7 @@ DXF 图纸
 python scripts/run_pipeline.py 图纸目录 --work work
 python scripts/run_pipeline.py 图纸目录 --work work --profile deep   # 语义深链
 python scripts/run_pipeline.py 图纸目录 --work work --resume         # 断点续跑
+python scripts/run_pipeline.py 图纸目录 --work work --with-report    # 顺带生成报告包（L4）
 # DWG 自动转换（探测工具）
 python scripts/cad_convert.py 图纸.dwg --detect
 python scripts/cad_convert.py 图纸.dwg --out 输出.dxf
@@ -194,7 +202,7 @@ cad-drawing-analyzer/
 │       ├── templates/            # report_template.md
 │       └── tests/sample_cases/   # 示例用例（catalog / quantities / wbs / texts）
 └── tests/
-    ├── smoke_test.py             # 27 条端到端冒烟断言
+    ├── smoke_test.py             # 29 条端到端冒烟断言
     └── fixtures/
         ├── make_mini_dxf.py      # 基础测试 DXF 生成器
         ├── make_quantity_dxf.py  # 工程量测试图生成器（1:100 图框/墙/门窗/梁筋/苗木）
@@ -215,6 +223,6 @@ cad-drawing-analyzer/
 ### 测试三：建筑平面图
 - ✅ 识别 6 樘窗、4 樘门，提取门编号和宽度
 ### 回归验证
-- 27 条端到端断言全部通过 ✅
-- `python tests/smoke_test.py -v`：27 条冒烟断言全部通过 ✅（清点 / 转换探测 / 目录 / 专业 / 算量 / WBS / Excel / 流水线 / 深链 / resume / quiet / PDF 量算 / YAML 缺失 / 文档一致性 / 工程量金标准 / 契约自检 / 版本戳 / 配置语义 / 契约校验 / 面积引擎 / 比例校准 / 图层角色 / 未识别图层 / 概况抽取 / 报告打包 / 模块开关 / 标签链）
+- 29 条端到端断言全部通过 ✅
+- `python tests/smoke_test.py -v`：29 条冒烟断言全部通过 ✅（清点 / 转换探测 / 目录 / 专业 / 算量 / WBS / Excel / 流水线 / 深链 / resume / quiet / PDF 量算 / YAML 缺失 / 文档一致性 / 工程量金标准 / 契约自检 / 版本戳 / 配置语义 / 契约校验 / 面积引擎 / 比例校准 / 图层角色 / 未识别图层 / 概况抽取 / 报告打包 / 模块开关 / 标签链 / 报告交付 / 默认不变）
 - `python scripts/contracts.py --check`：7 份 Schema + 4 份配置全量自检通过 ✅

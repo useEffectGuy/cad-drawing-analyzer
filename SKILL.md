@@ -30,6 +30,7 @@ description: 图智通：DXF/DWG/PDF 图纸识别、目录与专业判定、工�
 | 读整套图 / 出工程量（默认） | `python scripts/run_pipeline.py <输入> --work work` | `summary.json`、`工程量汇总统计.xlsx`、`分析报告.md` |
 | 语义深链：CIO/空间/工序/材料/审图 | 同上 `--profile deep` | `<图名>_CIO.json`、`_空间识别数据.json`、`_工序识别数据.json`、`_材料识别数据.json`、`_审图结果.json` |
 | 两条链一次跑完 | 同上 `--profile all` | 以上全部 + `summary.json` |
+| 流水线顺带出报告包（L4） | 同上追加 `--with-report` | `work/report_bundle/`（报告 + 概况 + 缺项 + 工程量 CSV + manifest），并登记到 `summary.json` |
 | 断点续跑 / 强制重算 / 只跑指定阶段 | `--resume` / `--force` / `--only catalog,wbs` / `--skip tables` | 命中缓存的阶段显示 `skipped` |
 
 ### 2.2 单步命令（按需调用）
@@ -67,7 +68,8 @@ DWG 无转换器时 `cad_convert --detect` 会打印安装指引，不硬解析 
 | 一键报告包 | `python modules/project_profile_report/src/report_assembler.py work --out work/report_bundle` | `project_report.md`、概况 JSON、缺项清单、工程量 CSV、manifest |
 
 该模块只读复用现有产物，不改工程量算法。开关位于 `modules/project_profile_report/config/module.yaml`
-的 `enable_project_profile_report`；关闭时不产生任何文件，主链路输出完全不变。
+的 `enable_project_profile_report`；关闭时不产生任何文件，主链路输出完全不变。主链路加 `--with-report`
+即在流水线末尾自动组装报告包；不带该参数时不会调用本模块。
 
 ## 三、中间产物目录（每次任务在 workspace 生成）
 
@@ -79,6 +81,7 @@ work/
 ├── label_chains.json                 # L2 四级标签链（可选，build_label_chain.py 生成）
 ├── <图名>_CIO.json、_空间识别数据.json、_工序识别数据.json、_材料识别数据.json、_审图结果.json
 ├── 工程量汇总统计.xlsx / 分析报告.md
+├── report_bundle/            # 可选：--with-report 生成的报告包（5 件）
 ├── summary.json              # 阶段状态 + 计数 + 交付物清单
 └── .pipeline/manifest.json   # 输入/脚本指纹，--resume 用
 ```

@@ -50,7 +50,7 @@ def load(path: str):
 
 
 class SmokeTest(unittest.TestCase):
-    """14 条端到端断言：清点 → 目录 → 专业 → 量算 → WBS → 汇总 → 流水线 + 深链 + resume + quiet + PDF 量算 + YAML 缺失 + 文档一致性。"""
+    """29 条端到端断言：清点 → 目录 → 专业 → 量算 → WBS → 汇总 → 流水线 + 深链 + resume + quiet + PDF 量算 + YAML 缺失 + 文档一致性 + PPR + 标签链 + 报告交付。"""
 
     @classmethod
     def setUpClass(cls):
@@ -550,6 +550,49 @@ class SmokeTest(unittest.TestCase):
             self.assertEqual(quantities_before, f.read(), "标签链不得改写工程量")
         with open(self.wbs_json, "rb") as f:
             self.assertEqual(wbs_before, f.read(), "标签链不得改写 WBS")
+
+    # ---- Phase 4 追加 2 条 ----
+
+    def test_28_pipeline_with_report(self):
+        """--with-report：流水线末尾生成 5 件报告包，并登记到 summary"""
+        w = os.path.join(self.tmp, "report_work")
+        self._ok("run_pipeline.py", self.dxf, "--work", w,
+                 "--profile", "standard", "--with-report", "--quiet")
+
+        summary = load(os.path.join(w, "summary.json"))
+        self.assertEqual(summary["failed"], [])
+        self.assertEqual(summary["report_bundle"]["status"], "ok")
+        self.assertEqual(
+            os.path.basename(summary["deliverables"]["report_bundle"]),
+            "report_bundle")
+
+        bundle_dir = os.path.join(w, "report_bundle")
+        self.assertTrue(os.path.isdir(bundle_dir))
+        self.assertEqual(sorted(os.listdir(bundle_dir)), sorted([
+            "project_report.md", "project_profile.json", "missing_items.json",
+            "engineering_quantities.csv", "bundle_manifest.json"]))
+
+        with open(os.path.join(bundle_dir, "project_report.md"),
+                  "r", encoding="utf-8") as f:
+            report = f.read()
+        self.assertIn("报告摘要", report)
+        self.assertIn("不替代正式预算", report)
+
+    def test_29_pipeline_default_no_report(self):
+        """不带 --with-report：不生成报告包，交付物清单与既有产物保持不变"""
+        self.assertFalse(
+            os.path.exists(os.path.join(self.pipeline_work, "report_bundle")),
+            "默认流水线不得生成 report_bundle")
+
+        summary = load(self.summary_json)
+        self.assertNotIn("report_bundle", summary)
+        self.assertNotIn("report_bundle", summary["deliverables"])
+        self.assertEqual(
+            sorted(summary["deliverables"]), ["catalog", "excel", "report"])
+        for name in ("工程量汇总统计.xlsx", "分析报告.md", "catalog.json"):
+            self.assertTrue(
+                os.path.isfile(os.path.join(self.pipeline_work, name)),
+                f"既有交付物 {name} 不应缺失")
 
 
 if __name__ == "__main__":
